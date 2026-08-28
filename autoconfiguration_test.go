@@ -2,6 +2,7 @@ package gbcarkhos_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -10,7 +11,9 @@ import (
 	"time"
 
 	"goark.dev/arkarta/servlet"
+	servletasync "goark.dev/arkarta/servlet/async"
 	servletcontainer "goark.dev/arkarta/servlet/container"
+	arkhosnethttp "goark.dev/arkhos/nethttp"
 	"goark.dev/boot"
 	"goark.dev/boot/configdata"
 	"goark.dev/gbc-arkhos"
@@ -52,6 +55,43 @@ goark:
 	}
 }
 
+func TestAutoConfigure_whenAsyncTimeoutConfigured_shouldApplyContainerAsyncTimeout(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "app.yml"), `
+goark:
+  web:
+    server:
+      address: 127.0.0.1:0
+    servlet:
+      async:
+        timeout: 10ms
+`)
+
+	app, err := boot.Run(
+		t.Context(),
+		boot.WithConfigDataOptions(configdata.WithLocations(root)),
+		boot.WithAutoConfiguration(gbcarkhos.AutoConfigure()),
+		boot.WithConfiguration(asyncDeploymentConfiguration{}),
+	)
+	if err != nil {
+		t.Fatalf("boot run failed: %v", err)
+	}
+	defer closeApp(t, app)
+
+	appContext, ok := app.Context()
+	if !ok {
+		t.Fatal("expected application context")
+	}
+	server, err := goark.Get[*gbcarkhos.EmbeddedServer](t.Context(), appContext, gbcarkhos.BeanNameServer)
+	if err != nil {
+		t.Fatalf("resolve embedded server failed: %v", err)
+	}
+	body := requestUntilOK(t, server.URL()+"/async-timeout")
+	if body != "timeout" {
+		t.Fatalf("body = %q, want timeout", body)
+	}
+}
+
 type deploymentConfiguration struct{}
 
 func (deploymentConfiguration) Name() string {
@@ -80,6 +120,44 @@ func (deploymentConfiguration) Register(ctx context.Context, registry *goarkcont
 		return err
 	}
 	return goarkcontainer.RegisterInstance[*servletcontainer.Deployment](registry, "testDeployment", deployment)
+}
+
+type asyncDeploymentConfiguration struct{}
+
+func (asyncDeploymentConfiguration) Name() string {
+	return "test.async-deployment"
+}
+
+func (asyncDeploymentConfiguration) Order() int {
+	return 0
+}
+
+func (asyncDeploymentConfiguration) Register(ctx context.Context, registry *goarkcontainer.Registry) error {
+	app, err := servlet.NewWebApp("async")
+	if err != nil {
+		return err
+	}
+	deployment, err := servletcontainer.NewDeployment(app,
+		servletcontainer.WithProfile(servletcontainer.ProfileAsyncStream),
+		servletcontainer.WithMapping("/", servlet.HandlerFunc(func(ctx context.Context, req *servlet.Request, res servlet.Response) error {
+			if req.Path() != "/async-timeout" {
+				return servlet.NewHTTPError(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil)
+			}
+			asyncCtx, err := arkhosnethttp.StartAsync(ctx, req, res)
+			if err != nil {
+				return err
+			}
+			if err := asyncCtx.Await(context.Background()); !errors.Is(err, servletasync.ErrTimeout) {
+				return err
+			}
+			_, err = res.WriteString("timeout")
+			return err
+		})),
+	)
+	if err != nil {
+		return err
+	}
+	return goarkcontainer.RegisterInstance[*servletcontainer.Deployment](registry, "testAsyncDeployment", deployment)
 }
 
 func requestUntilOK(t *testing.T, target string) string {

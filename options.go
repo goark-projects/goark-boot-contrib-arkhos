@@ -4,11 +4,14 @@ import (
 	"strings"
 	"time"
 
+	"goark.dev/arkarta/servlet/async"
 	"goark.dev/arkarta/servlet/multipart"
 	arkhosnethttp "goark.dev/arkhos/nethttp"
 	coreenv "goark.dev/goark/core/env"
 	arkerrors "goark.dev/goark/errors"
 )
+
+const propertySpringMVCAsyncRequestTimeout = "spring.mvc.async.request-timeout"
 
 // Option 定制 Arkhos 自动配置。
 type Option func(*settings) error
@@ -21,6 +24,7 @@ type settings struct {
 	idleTimeout       time.Duration
 	maxHeaderBytes    int
 	multipart         multipartSettings
+	async             asyncSettings
 	containerOptions  []arkhosnethttp.ContainerOption
 	serverOptions     []arkhosnethttp.ServerOption
 }
@@ -31,6 +35,10 @@ type multipartSettings struct {
 	maxFileSize       int64
 	maxRequestSize    int64
 	fileSizeThreshold int64
+}
+
+type asyncSettings struct {
+	timeout time.Duration
 }
 
 // WithAddress 设置嵌入式 Web 服务监听地址。
@@ -76,6 +84,17 @@ func WithMultipartConfig(config multipart.Config) Option {
 	return WithContainerOptions(arkhosnethttp.WithMultipartConfig(config))
 }
 
+// WithAsyncTimeout 设置 Servlet 异步请求默认超时；0 表示不设置容器默认超时。
+func WithAsyncTimeout(timeout time.Duration) Option {
+	return func(config *settings) error {
+		if timeout < 0 {
+			return arkerrors.Newf(arkerrors.CodeInvalidArgument, "arkhos async timeout %s must be >= 0", timeout)
+		}
+		config.async.timeout = timeout
+		return nil
+	}
+}
+
 func newSettings(environment coreenv.Environment, options []Option) (settings, error) {
 	config := settings{address: DefaultAddress}
 	if err := config.applyEnvironment(environment); err != nil {
@@ -116,7 +135,10 @@ func (s *settings) applyEnvironment(environment coreenv.Environment) error {
 	if err := readInt(environment, PropertyServerMaxHeaderBytes, &s.maxHeaderBytes); err != nil {
 		return err
 	}
-	return s.readMultipart(environment)
+	if err := s.readMultipart(environment); err != nil {
+		return err
+	}
+	return s.readAsync(environment)
 }
 
 func (s *settings) readMultipart(environment coreenv.Environment) error {
@@ -133,8 +155,26 @@ func (s *settings) readMultipart(environment coreenv.Environment) error {
 	return readInt64(environment, PropertyMultipartFileSizeThreshold, &s.multipart.fileSizeThreshold, &s.multipart.enabled)
 }
 
+func (s *settings) readAsync(environment coreenv.Environment) error {
+	timeout, ok, err := readDurationFirst(environment, PropertyAsyncTimeout, propertySpringMVCAsyncRequestTimeout)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	if timeout < 0 {
+		return arkerrors.Newf(arkerrors.CodeInvalidArgument, "async timeout %s must be >= 0", timeout)
+	}
+	s.async.timeout = timeout
+	return nil
+}
+
 func (s settings) buildContainerOptions() []arkhosnethttp.ContainerOption {
-	options := make([]arkhosnethttp.ContainerOption, 0, len(s.containerOptions)+1)
+	options := make([]arkhosnethttp.ContainerOption, 0, len(s.containerOptions)+2)
+	if s.async.timeout > 0 {
+		options = append(options, arkhosnethttp.WithAsyncOptions(async.WithTimeout(s.async.timeout)))
+	}
 	if s.multipart.enabled {
 		options = append(options, arkhosnethttp.WithMultipartConfig(multipart.NewConfig(
 			multipart.WithLocation(s.multipart.location),
@@ -178,6 +218,19 @@ func readDuration(environment coreenv.Environment, key string, target *time.Dura
 		*target = value
 	}
 	return nil
+}
+
+func readDurationFirst(environment coreenv.Environment, keys ...string) (time.Duration, bool, error) {
+	for _, key := range keys {
+		value, ok, err := coreenv.GetPropertyAsValue[time.Duration](environment, key)
+		if err != nil {
+			return 0, false, arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read duration property %q", key)
+		}
+		if ok {
+			return value, true, nil
+		}
+	}
+	return 0, false, nil
 }
 
 func readInt(environment coreenv.Environment, key string, target *int) error {

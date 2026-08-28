@@ -37,3 +37,8 @@ const (
 	// PropertyMultipartFileSizeThreshold 设置 multipart 落盘前内存阈值。
 	PropertyMultipartFileSizeThreshold = "goark.web.servlet.multipart.file-size-threshold"
 )
+
+const (
+	// PropertyAsyncTimeout 设置 Servlet 异步请求超时。
+	PropertyAsyncTimeout = "goark.web.servlet.async.timeout"
+)

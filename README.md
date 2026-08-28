@@ -17,7 +17,7 @@ Official Goark Boot starter module for the Arkhos embedded web container.
 - Arkhos embedded container bootstrap.
 - Arkarta servlet deployment binding.
 - Boot lifecycle integration for start and graceful stop.
-- Server configuration mapping for address, timeouts, header limits, and multipart parsing.
+- Server configuration mapping for address, timeouts, header limits, multipart parsing, and Servlet async timeout.
 
 ## Usage
 
@@ -59,6 +59,9 @@ Use this module directly when you need the embedded Arkhos container with manual
 | `goark.web.servlet.multipart.max-file-size` | unset | Maximum single uploaded file size in bytes. |
 | `goark.web.servlet.multipart.max-request-size` | unset | Maximum multipart request size in bytes. |
 | `goark.web.servlet.multipart.file-size-threshold` | unset | In-memory threshold before multipart data spills to disk. |
+| `goark.web.servlet.async.timeout` | unset | Default Servlet async timeout, parsed as Go duration. |
+
+`spring.mvc.async.request-timeout` is accepted as a Spring-compatible alias for `goark.web.servlet.async.timeout`.
 
 ## Development
 
@@ -87,7 +90,7 @@ Goark 官方维护的 Arkhos 嵌入式 Web 容器启动器模块。
 - 启动 Arkhos 嵌入式容器。
 - 绑定 Arkarta Servlet 部署模型。
 - 接入 Boot 生命周期，支持启动与优雅停止。
-- 映射地址、超时、请求头限制和 multipart 等服务端配置。
+- 映射地址、超时、请求头限制、multipart 和 Servlet async 超时等服务端配置。
 
 ## 使用方式
 
@@ -108,6 +111,9 @@ Goark 官方维护的 Arkhos 嵌入式 Web 容器启动器模块。
 | `goark.web.servlet.multipart.max-file-size` | 未设置 | 单个上传文件最大字节数。 |
 | `goark.web.servlet.multipart.max-request-size` | 未设置 | multipart 请求最大字节数。 |
 | `goark.web.servlet.multipart.file-size-threshold` | 未设置 | multipart 数据落盘前的内存阈值。 |
+| `goark.web.servlet.async.timeout` | 未设置 | Servlet async 默认超时，按 Go duration 解析。 |
+
+`spring.mvc.async.request-timeout` 可作为 `goark.web.servlet.async.timeout` 的 Spring 兼容别名。
 
 ## 开发
 

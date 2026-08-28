@@ -29,6 +29,7 @@ func TestNewSettings_whenEnvironmentPropertiesExist_shouldApplyServerProperties(
 		PropertyServerWriteTimeout:         "3s",
 		PropertyServerIdleTimeout:          "4s",
 		PropertyServerMaxHeaderBytes:       "8192",
+		PropertyAsyncTimeout:               "250ms",
 		PropertyMultipartLocation:          "tmp/uploads",
 		PropertyMultipartMaxFileSize:       "1048576",
 		PropertyMultipartMaxRequestSize:    "2097152",
@@ -55,6 +56,9 @@ func TestNewSettings_whenEnvironmentPropertiesExist_shouldApplyServerProperties(
 	if settings.maxHeaderBytes != 8192 {
 		t.Fatalf("max header bytes = %d", settings.maxHeaderBytes)
 	}
+	if settings.async.timeout != 250*time.Millisecond {
+		t.Fatalf("async timeout = %s", settings.async.timeout)
+	}
 	if !settings.multipart.enabled {
 		t.Fatal("multipart should be enabled when multipart properties exist")
 	}
@@ -80,6 +84,28 @@ func TestNewSettings_whenOptionOverridesEnvironment_shouldUseOptionValue(t *test
 
 	if settings.address != "127.0.0.1:0" {
 		t.Fatalf("address = %q, want option value", settings.address)
+	}
+}
+
+func TestNewSettings_whenSpringAsyncAliasExists_shouldApplyAsyncTimeout(t *testing.T) {
+	environment := newTestEnvironment(t, map[string]any{
+		propertySpringMVCAsyncRequestTimeout: "75ms",
+	})
+
+	settings, err := newSettings(environment, nil)
+	if err != nil {
+		t.Fatalf("new settings failed: %v", err)
+	}
+
+	if settings.async.timeout != 75*time.Millisecond {
+		t.Fatalf("async timeout = %s, want 75ms", settings.async.timeout)
+	}
+}
+
+func TestNewSettings_whenAsyncTimeoutIsNegative_shouldReturnError(t *testing.T) {
+	_, err := newSettings(nil, []Option{WithAsyncTimeout(-time.Millisecond)})
+	if err == nil {
+		t.Fatal("expected negative async timeout error")
 	}
 }
 
