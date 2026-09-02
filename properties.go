@@ -25,6 +25,13 @@ const (
 	PropertyServerIdleTimeout = "goark.web.server.idle-timeout"
 	// PropertyServerMaxHeaderBytes 设置请求头最大字节数。
 	PropertyServerMaxHeaderBytes = "goark.web.server.max-header-bytes"
+	// PropertyServerMaxRequestBodySize 设置整个 HTTP 请求体最大字节数。
+	PropertyServerMaxRequestBodySize = "goark.web.server.max-request-body-size"
+)
+
+const (
+	// PropertyFormMaxBodySize 设置 URL 编码表单体解析上限。
+	PropertyFormMaxBodySize = "goark.web.servlet.form.max-body-size"
 )
 
 const (

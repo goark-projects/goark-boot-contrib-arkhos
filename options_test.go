@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"goark.dev/arkarta/servlet"
+	"goark.dev/arkhos/hertz"
 	coreenv "goark.dev/goark/core/env"
 )
 
@@ -19,6 +21,12 @@ func TestNewSettings_whenEnvironmentIsNil_shouldUseSafeDefaults(t *testing.T) {
 	if settings.readTimeout != 0 || settings.writeTimeout != 0 || settings.idleTimeout != 0 {
 		t.Fatalf("timeouts should be unset by default: %+v", settings)
 	}
+	if settings.maxFormBodySize != servlet.DefaultMaxFormBodySize {
+		t.Fatalf("form body size = %d, want %d", settings.maxFormBodySize, servlet.DefaultMaxFormBodySize)
+	}
+	if settings.maxRequestBodySize != int(servlet.DefaultMaxFormBodySize) {
+		t.Fatalf("request body size = %d, want %d", settings.maxRequestBodySize, servlet.DefaultMaxFormBodySize)
+	}
 }
 
 func TestNewSettings_whenEnvironmentPropertiesExist_shouldApplyServerProperties(t *testing.T) {
@@ -29,6 +37,8 @@ func TestNewSettings_whenEnvironmentPropertiesExist_shouldApplyServerProperties(
 		PropertyServerWriteTimeout:         "3s",
 		PropertyServerIdleTimeout:          "4s",
 		PropertyServerMaxHeaderBytes:       "8192",
+		PropertyServerMaxRequestBodySize:   "20MiB",
+		PropertyFormMaxBodySize:            "10MiB",
 		PropertyAsyncTimeout:               "250ms",
 		PropertyMultipartLocation:          "tmp/uploads",
 		PropertyMultipartMaxFileSize:       "1048576",
@@ -55,6 +65,12 @@ func TestNewSettings_whenEnvironmentPropertiesExist_shouldApplyServerProperties(
 	}
 	if settings.maxHeaderBytes != 8192 {
 		t.Fatalf("max header bytes = %d", settings.maxHeaderBytes)
+	}
+	if settings.maxRequestBodySize != 20<<20 {
+		t.Fatalf("max request body size = %d", settings.maxRequestBodySize)
+	}
+	if settings.maxFormBodySize != 10<<20 {
+		t.Fatalf("max form body size = %d", settings.maxFormBodySize)
 	}
 	if settings.async.timeout != 250*time.Millisecond {
 		t.Fatalf("async timeout = %s", settings.async.timeout)
@@ -124,6 +140,16 @@ func TestNewSettings_whenDurationIsInvalid_shouldReturnError(t *testing.T) {
 	_, err := newSettings(environment, nil)
 	if err == nil {
 		t.Fatal("expected duration conversion error")
+	}
+}
+
+func TestNewSettings_whenCustomProviderUsesHertzOptions_shouldReturnError(t *testing.T) {
+	_, err := newSettings(nil, []Option{
+		WithProvider(&providerTestProvider{}),
+		WithContainerOptions(hertz.WithMaxFormBodySize(1024)),
+	})
+	if err == nil {
+		t.Fatal("expected custom provider and Hertz options conflict")
 	}
 }
 

@@ -13,7 +13,7 @@ import (
 	"goark.dev/arkarta/servlet"
 	servletasync "goark.dev/arkarta/servlet/async"
 	servletcontainer "goark.dev/arkarta/servlet/container"
-	arkhosnethttp "goark.dev/arkhos/nethttp"
+	"goark.dev/arkhos/hertz"
 	"goark.dev/boot"
 	"goark.dev/boot/configdata"
 	"goark.dev/gbc-arkhos"
@@ -143,7 +143,7 @@ func (asyncDeploymentConfiguration) Register(ctx context.Context, registry *goar
 			if req.Path() != "/async-timeout" {
 				return servlet.NewHTTPError(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil)
 			}
-			asyncCtx, err := arkhosnethttp.StartAsync(ctx, req, res)
+			asyncCtx, err := hertz.StartAsync(ctx, req, res)
 			if err != nil {
 				return err
 			}
@@ -162,7 +162,9 @@ func (asyncDeploymentConfiguration) Register(ctx context.Context, registry *goar
 
 func requestUntilOK(t *testing.T, target string) string {
 	t.Helper()
-	client := http.Client{Timeout: time.Second}
+	transport := &http.Transport{DisableKeepAlives: true}
+	defer transport.CloseIdleConnections()
+	client := http.Client{Transport: transport, Timeout: time.Second}
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		response, err := client.Get(target)

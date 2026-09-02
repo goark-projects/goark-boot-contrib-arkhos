@@ -4,9 +4,9 @@ import (
 	"strings"
 	"time"
 
-	"goark.dev/arkarta/servlet/async"
+	"goark.dev/arkarta/servlet"
 	"goark.dev/arkarta/servlet/multipart"
-	arkhosnethttp "goark.dev/arkhos/nethttp"
+	"goark.dev/arkhos/hertz"
 	coreenv "goark.dev/goark/core/env"
 	arkerrors "goark.dev/goark/errors"
 )
@@ -17,16 +17,19 @@ const propertySpringMVCAsyncRequestTimeout = "spring.mvc.async.request-timeout"
 type Option func(*settings) error
 
 type settings struct {
-	address           string
-	readTimeout       time.Duration
-	readHeaderTimeout time.Duration
-	writeTimeout      time.Duration
-	idleTimeout       time.Duration
-	maxHeaderBytes    int
-	multipart         multipartSettings
-	async             asyncSettings
-	containerOptions  []arkhosnethttp.ContainerOption
-	serverOptions     []arkhosnethttp.ServerOption
+	provider           Provider
+	address            string
+	readTimeout        time.Duration
+	readHeaderTimeout  time.Duration
+	writeTimeout       time.Duration
+	idleTimeout        time.Duration
+	maxHeaderBytes     int
+	maxRequestBodySize int
+	maxFormBodySize    int64
+	multipart          multipartSettings
+	async              asyncSettings
+	containerOptions   []hertz.ContainerOption
+	serverOptions      []hertz.ServerOption
 }
 
 type multipartSettings struct {
@@ -35,10 +38,22 @@ type multipartSettings struct {
 	maxFileSize       int64
 	maxRequestSize    int64
 	fileSizeThreshold int64
+	config            *multipart.Config
 }
 
 type asyncSettings struct {
 	timeout time.Duration
+}
+
+// WithProvider 替换 Arkarta 容器和网络 Server 实现。
+func WithProvider(provider Provider) Option {
+	return func(config *settings) error {
+		if provider == nil {
+			return arkerrors.New(arkerrors.CodeInvalidArgument, "arkhos provider is nil")
+		}
+		config.provider = provider
+		return nil
+	}
 }
 
 // WithAddress 设置嵌入式 Web 服务监听地址。
@@ -53,9 +68,9 @@ func WithAddress(address string) Option {
 	}
 }
 
-// WithServerOptions 追加底层 Arkhos HTTP Server 选项。
-func WithServerOptions(options ...arkhosnethttp.ServerOption) Option {
-	copied := append([]arkhosnethttp.ServerOption(nil), options...)
+// WithServerOptions 追加默认 Hertz HTTP Server 选项。
+func WithServerOptions(options ...hertz.ServerOption) Option {
+	copied := append([]hertz.ServerOption(nil), options...)
 	return func(config *settings) error {
 		for _, option := range copied {
 			if option != nil {
@@ -66,9 +81,9 @@ func WithServerOptions(options ...arkhosnethttp.ServerOption) Option {
 	}
 }
 
-// WithContainerOptions 追加底层 Arkhos 容器选项。
-func WithContainerOptions(options ...arkhosnethttp.ContainerOption) Option {
-	copied := append([]arkhosnethttp.ContainerOption(nil), options...)
+// WithContainerOptions 追加默认 Hertz 容器选项。
+func WithContainerOptions(options ...hertz.ContainerOption) Option {
+	copied := append([]hertz.ContainerOption(nil), options...)
 	return func(config *settings) error {
 		for _, option := range copied {
 			if option != nil {
@@ -81,7 +96,11 @@ func WithContainerOptions(options ...arkhosnethttp.ContainerOption) Option {
 
 // WithMultipartConfig 设置标准 multipart 解析配置。
 func WithMultipartConfig(config multipart.Config) Option {
-	return WithContainerOptions(arkhosnethttp.WithMultipartConfig(config))
+	return func(settings *settings) error {
+		settings.multipart.enabled = true
+		settings.multipart.config = &config
+		return nil
+	}
 }
 
 // WithAsyncTimeout 设置 Servlet 异步请求默认超时；0 表示不设置容器默认超时。
@@ -96,7 +115,11 @@ func WithAsyncTimeout(timeout time.Duration) Option {
 }
 
 func newSettings(environment coreenv.Environment, options []Option) (settings, error) {
-	config := settings{address: DefaultAddress}
+	config := settings{
+		address:            DefaultAddress,
+		maxFormBodySize:    servlet.DefaultMaxFormBodySize,
+		maxRequestBodySize: int(servlet.DefaultMaxFormBodySize),
+	}
 	if err := config.applyEnvironment(environment); err != nil {
 		return settings{}, err
 	}
@@ -108,7 +131,60 @@ func newSettings(environment coreenv.Environment, options []Option) (settings, e
 			return settings{}, err
 		}
 	}
+	if err := config.validate(); err != nil {
+		return settings{}, err
+	}
 	return config, nil
+}
+
+func (s settings) validate() error {
+	if s.provider != nil && (len(s.containerOptions) > 0 || len(s.serverOptions) > 0) {
+		return arkerrors.New(arkerrors.CodeInvalidArgument, "custom provider cannot use Hertz-specific options")
+	}
+	return nil
+}
+
+func (s settings) resolvedProvider() Provider {
+	if s.provider != nil {
+		return s.provider
+	}
+	return hertzProvider{
+		containerOptions: append([]hertz.ContainerOption(nil), s.containerOptions...),
+		serverOptions:    append([]hertz.ServerOption(nil), s.serverOptions...),
+	}
+}
+
+func (s settings) containerConfiguration() ContainerConfiguration {
+	config := ContainerConfiguration{
+		AsyncTimeout:    s.async.timeout,
+		MaxFormBodySize: s.maxFormBodySize,
+	}
+	if s.multipart.enabled {
+		config.MultipartEnable = true
+		if s.multipart.config != nil {
+			config.Multipart = *s.multipart.config
+		} else {
+			config.Multipart = multipart.NewConfig(
+				multipart.WithLocation(s.multipart.location),
+				multipart.WithMaxFileSize(s.multipart.maxFileSize),
+				multipart.WithMaxRequestSize(s.multipart.maxRequestSize),
+				multipart.WithFileSizeThreshold(s.multipart.fileSizeThreshold),
+			)
+		}
+	}
+	return config
+}
+
+func (s settings) serverConfiguration() ServerConfiguration {
+	return ServerConfiguration{
+		Address:            s.address,
+		ReadTimeout:        s.readTimeout,
+		ReadHeaderTimeout:  s.readHeaderTimeout,
+		WriteTimeout:       s.writeTimeout,
+		IdleTimeout:        s.idleTimeout,
+		MaxHeaderBytes:     s.maxHeaderBytes,
+		MaxRequestBodySize: s.maxRequestBodySize,
+	}
 }
 
 func (s *settings) applyEnvironment(environment coreenv.Environment) error {
@@ -133,6 +209,12 @@ func (s *settings) applyEnvironment(environment coreenv.Environment) error {
 		return err
 	}
 	if err := readInt(environment, PropertyServerMaxHeaderBytes, &s.maxHeaderBytes); err != nil {
+		return err
+	}
+	if err := readByteSize(environment, PropertyServerMaxRequestBodySize, &s.maxRequestBodySize); err != nil {
+		return err
+	}
+	if err := readByteSize64(environment, PropertyFormMaxBodySize, &s.maxFormBodySize); err != nil {
 		return err
 	}
 	if err := s.readMultipart(environment); err != nil {
@@ -168,45 +250,6 @@ func (s *settings) readAsync(environment coreenv.Environment) error {
 	}
 	s.async.timeout = timeout
 	return nil
-}
-
-func (s settings) buildContainerOptions() []arkhosnethttp.ContainerOption {
-	options := make([]arkhosnethttp.ContainerOption, 0, len(s.containerOptions)+2)
-	if s.async.timeout > 0 {
-		options = append(options, arkhosnethttp.WithAsyncOptions(async.WithTimeout(s.async.timeout)))
-	}
-	if s.multipart.enabled {
-		options = append(options, arkhosnethttp.WithMultipartConfig(multipart.NewConfig(
-			multipart.WithLocation(s.multipart.location),
-			multipart.WithMaxFileSize(s.multipart.maxFileSize),
-			multipart.WithMaxRequestSize(s.multipart.maxRequestSize),
-			multipart.WithFileSizeThreshold(s.multipart.fileSizeThreshold),
-		)))
-	}
-	options = append(options, s.containerOptions...)
-	return options
-}
-
-func (s settings) buildServerOptions() []arkhosnethttp.ServerOption {
-	options := make([]arkhosnethttp.ServerOption, 0, len(s.serverOptions)+6)
-	options = append(options, arkhosnethttp.WithAddress(s.address))
-	if s.readTimeout > 0 {
-		options = append(options, arkhosnethttp.WithReadTimeout(s.readTimeout))
-	}
-	if s.readHeaderTimeout > 0 {
-		options = append(options, arkhosnethttp.WithReadHeaderTimeout(s.readHeaderTimeout))
-	}
-	if s.writeTimeout > 0 {
-		options = append(options, arkhosnethttp.WithWriteTimeout(s.writeTimeout))
-	}
-	if s.idleTimeout > 0 {
-		options = append(options, arkhosnethttp.WithIdleTimeout(s.idleTimeout))
-	}
-	if s.maxHeaderBytes > 0 {
-		options = append(options, arkhosnethttp.WithMaxHeaderBytes(s.maxHeaderBytes))
-	}
-	options = append(options, s.serverOptions...)
-	return options
 }
 
 func readDuration(environment coreenv.Environment, key string, target *time.Duration) error {

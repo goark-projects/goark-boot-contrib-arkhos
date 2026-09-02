@@ -18,6 +18,19 @@ Official Goark Boot starter module for the Arkhos embedded web container.
 - Arkarta servlet deployment binding.
 - Boot lifecycle integration for start and graceful stop.
 - Server configuration mapping for address, timeouts, header limits, multipart parsing, and Servlet async timeout.
+- A transport-neutral provider boundary based on `arkarta/servlet/container.Container`.
+
+Hertz is the default embedded implementation. `net/http` remains an explicit Arkhos reference and compatibility implementation; it is not selected implicitly by this starter.
+
+## Container replacement
+
+Application deployments depend only on Arkarta contracts. A future gnet or fasthttp starter must expose the same call shape:
+
+```go
+boot.WithAutoConfiguration(containerstarter.AutoConfigure())
+```
+
+Replacing the container changes the starter module/import only. Business handlers, Arkarta deployments, configuration property names, and the `AutoConfigure()` call remain unchanged. Go cannot activate a module that is only present in `go.mod` and never imported, so dependency-only runtime discovery is intentionally not used.
 
 ## Usage
 
@@ -55,6 +68,8 @@ Use this module directly when you need the embedded Arkhos container with manual
 | `goark.web.server.write-timeout` | unset | Response write timeout, parsed as Go duration. |
 | `goark.web.server.idle-timeout` | unset | Keep-alive idle timeout, parsed as Go duration. |
 | `goark.web.server.max-header-bytes` | unset | Maximum HTTP header bytes. |
+| `goark.web.server.max-request-body-size` | `10MiB` | Maximum complete HTTP request body size. |
+| `goark.web.servlet.form.max-body-size` | `10MiB` | Maximum URL-encoded form body size. |
 | `goark.web.servlet.multipart.location` | unset | Temporary directory for multipart files. |
 | `goark.web.servlet.multipart.max-file-size` | unset | Maximum single uploaded file size in bytes. |
 | `goark.web.servlet.multipart.max-request-size` | unset | Maximum multipart request size in bytes. |
@@ -91,6 +106,19 @@ Goark 官方维护的 Arkhos 嵌入式 Web 容器启动器模块。
 - 绑定 Arkarta Servlet 部署模型。
 - 接入 Boot 生命周期，支持启动与优雅停止。
 - 映射地址、超时、请求头限制、multipart 和 Servlet async 超时等服务端配置。
+- 基于 `arkarta/servlet/container.Container` 提供与传输实现无关的 Provider 边界。
+
+Hertz 是默认嵌入式实现。`net/http` 保留为 Arkhos 显式参考实现和兼容实现，本 starter 不会隐式选择它。
+
+## 容器替换
+
+业务 Deployment 只依赖 Arkarta 标准契约。未来 gnet 或 fasthttp starter 必须提供相同调用形态：
+
+```go
+boot.WithAutoConfiguration(containerstarter.AutoConfigure())
+```
+
+替换容器时只修改 starter 模块依赖和 import；业务 Handler、Arkarta Deployment、配置属性名以及 `AutoConfigure()` 调用均保持不变。Go 不会链接仅写入 `go.mod` 而未被 import 的模块，因此不采用不可靠的纯依赖运行时发现机制。
 
 ## 使用方式
 
@@ -107,6 +135,8 @@ Goark 官方维护的 Arkhos 嵌入式 Web 容器启动器模块。
 | `goark.web.server.write-timeout` | 未设置 | 响应写出超时，按 Go duration 解析。 |
 | `goark.web.server.idle-timeout` | 未设置 | keep-alive 空闲超时，按 Go duration 解析。 |
 | `goark.web.server.max-header-bytes` | 未设置 | HTTP 请求头最大字节数。 |
+| `goark.web.server.max-request-body-size` | `10MiB` | 完整 HTTP 请求体最大值。 |
+| `goark.web.servlet.form.max-body-size` | `10MiB` | URL 编码表单请求体最大值。 |
 | `goark.web.servlet.multipart.location` | 未设置 | multipart 临时文件目录。 |
 | `goark.web.servlet.multipart.max-file-size` | 未设置 | 单个上传文件最大字节数。 |
 | `goark.web.servlet.multipart.max-request-size` | 未设置 | multipart 请求最大字节数。 |

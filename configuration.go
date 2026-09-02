@@ -4,7 +4,6 @@ import (
 	"context"
 
 	servletcontainer "goark.dev/arkarta/servlet/container"
-	arkhosnethttp "goark.dev/arkhos/nethttp"
 	"goark.dev/boot"
 	"goark.dev/goark"
 	goarkcontainer "goark.dev/goark/container"
@@ -40,11 +39,12 @@ func (c configuration) RegisterWithContext(_ context.Context, config appcontext.
 	if err != nil {
 		return err
 	}
-	if err := goarkcontainer.Register[*arkhosnethttp.Container](
+	provider := resolved.resolvedProvider()
+	if err := goarkcontainer.Register[servletcontainer.Container](
 		config.Registry(),
 		BeanNameContainer,
-		func(context.Context, goarkcontainer.Resolver) (*arkhosnethttp.Container, error) {
-			return arkhosnethttp.NewContainer(resolved.buildContainerOptions()...), nil
+		func(context.Context, goarkcontainer.Resolver) (servletcontainer.Container, error) {
+			return provider.NewContainer(resolved.containerConfiguration())
 		},
 	); err != nil {
 		return err
@@ -53,7 +53,7 @@ func (c configuration) RegisterWithContext(_ context.Context, config appcontext.
 		config.Registry(),
 		BeanNameServer,
 		func(ctx context.Context, resolver goarkcontainer.Resolver) (*EmbeddedServer, error) {
-			container, err := goark.Get[*arkhosnethttp.Container](ctx, resolver, BeanNameContainer)
+			container, err := goark.Get[servletcontainer.Container](ctx, resolver, BeanNameContainer)
 			if err != nil {
 				return nil, err
 			}
@@ -61,7 +61,7 @@ func (c configuration) RegisterWithContext(_ context.Context, config appcontext.
 			if err != nil {
 				return nil, err
 			}
-			return NewEmbeddedServer(container, deployments, resolved.buildServerOptions()...)
+			return NewEmbeddedServer(container, deployments, provider, resolved.serverConfiguration())
 		},
 		goarkcontainer.WithDependencies(BeanNameContainer),
 	)

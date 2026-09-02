@@ -4,12 +4,9 @@ import (
 	"context"
 	stderrors "errors"
 	"net"
-	"net/http"
-	"strings"
 	"sync"
 
 	servletcontainer "goark.dev/arkarta/servlet/container"
-	arkhosnethttp "goark.dev/arkhos/nethttp"
 	arkerrors "goark.dev/goark/errors"
 )
 
@@ -26,27 +23,32 @@ const (
 
 // EmbeddedServer 将 Arkhos HTTP Server 接入 Goark 生命周期。
 type EmbeddedServer struct {
-	container   *arkhosnethttp.Container
+	container   servletcontainer.Container
 	deployments []*servletcontainer.Deployment
-	options     []arkhosnethttp.ServerOption
+	provider    Provider
+	config      ServerConfiguration
 
 	mu       sync.Mutex
 	state    serverState
-	server   *arkhosnethttp.Server
+	server   ManagedServer
 	listener net.Listener
 	errCh    chan error
 	address  string
 }
 
 // NewEmbeddedServer 创建嵌入式 Arkhos 服务。
-func NewEmbeddedServer(container *arkhosnethttp.Container, deployments []*servletcontainer.Deployment, options ...arkhosnethttp.ServerOption) (*EmbeddedServer, error) {
+func NewEmbeddedServer(container servletcontainer.Container, deployments []*servletcontainer.Deployment, provider Provider, config ServerConfiguration) (*EmbeddedServer, error) {
 	if container == nil {
 		return nil, arkerrors.New(arkerrors.CodeInvalidArgument, "arkhos container is nil")
+	}
+	if provider == nil {
+		return nil, arkerrors.New(arkerrors.CodeInvalidArgument, "arkhos provider is nil")
 	}
 	return &EmbeddedServer{
 		container:   container,
 		deployments: append([]*servletcontainer.Deployment(nil), deployments...),
-		options:     append([]arkhosnethttp.ServerOption(nil), options...),
+		provider:    provider,
+		config:      config,
 	}, nil
 }
 
@@ -66,16 +68,19 @@ func (s *EmbeddedServer) Start(ctx context.Context) error {
 		return err
 	}
 
-	listener, err := net.Listen("tcp", s.listenAddress())
+	server, err := s.provider.NewServer(s.container, s.config)
+	if err != nil {
+		s.failStart()
+		return arkerrors.Wrap(arkerrors.CodeLifecycle, err, "failed to create arkhos server")
+	}
+	if server == nil {
+		s.failStart()
+		return arkerrors.New(arkerrors.CodeLifecycle, "arkhos provider returned nil server")
+	}
+	listener, err := net.Listen("tcp", server.Address())
 	if err != nil {
 		s.failStart()
 		return arkerrors.Wrap(arkerrors.CodeLifecycle, err, "failed to listen arkhos server")
-	}
-	server, err := arkhosnethttp.NewServer(s.container, s.options...)
-	if err != nil {
-		_ = listener.Close()
-		s.failStart()
-		return arkerrors.Wrap(arkerrors.CodeLifecycle, err, "failed to create arkhos server")
 	}
 	if err := s.deploy(ctx); err != nil {
 		_ = listener.Close()
@@ -83,13 +88,6 @@ func (s *EmbeddedServer) Start(ctx context.Context) error {
 		s.failStart()
 		return err
 	}
-	if err := s.container.Start(ctx); err != nil {
-		_ = listener.Close()
-		_ = s.container.Shutdown(ctx)
-		s.failStart()
-		return arkerrors.Wrap(arkerrors.CodeLifecycle, err, "failed to start arkhos container")
-	}
-
 	errCh := make(chan error, 1)
 	s.finishStart(server, listener, errCh)
 	go func() {
@@ -116,14 +114,15 @@ func (s *EmbeddedServer) Stop(ctx context.Context) error {
 	if ctx == nil {
 		return arkerrors.New(arkerrors.CodeInvalidArgument, "context is nil")
 	}
-	server, errCh, stop, err := s.beginStop()
+	server, listener, errCh, stop, err := s.beginStop()
 	if err != nil || !stop {
 		return err
 	}
 	shutdownErr := server.Shutdown(ctx)
 	serveErr := waitServer(ctx, errCh)
+	listenerErr := closeListener(listener)
 	s.finishStop()
-	return stderrors.Join(shutdownErr, serveErr)
+	return stderrors.Join(shutdownErr, listenerErr, serveErr)
 }
 
 // Close 释放生命周期资源。
@@ -190,7 +189,7 @@ func (s *EmbeddedServer) failStart() {
 	s.state = serverStateClosed
 }
 
-func (s *EmbeddedServer) finishStart(server *arkhosnethttp.Server, listener net.Listener, errCh chan error) {
+func (s *EmbeddedServer) finishStart(server ManagedServer, listener net.Listener, errCh chan error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.server = server
@@ -200,17 +199,17 @@ func (s *EmbeddedServer) finishStart(server *arkhosnethttp.Server, listener net.
 	s.state = serverStateRunning
 }
 
-func (s *EmbeddedServer) beginStop() (*arkhosnethttp.Server, chan error, bool, error) {
+func (s *EmbeddedServer) beginStop() (ManagedServer, net.Listener, chan error, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch s.state {
 	case serverStateNew, serverStateStopped, serverStateClosed:
-		return nil, nil, false, nil
+		return nil, nil, nil, false, nil
 	case serverStateRunning:
 		s.state = serverStateStopping
-		return s.server, s.errCh, true, nil
+		return s.server, s.listener, s.errCh, true, nil
 	default:
-		return nil, nil, false, arkerrors.New(arkerrors.CodeConflict, "embedded server is busy")
+		return nil, nil, nil, false, arkerrors.New(arkerrors.CodeConflict, "embedded server is busy")
 	}
 }
 
@@ -224,21 +223,6 @@ func (s *EmbeddedServer) finishStop() {
 	if s.state != serverStateClosed {
 		s.state = serverStateStopped
 	}
-}
-
-func (s *EmbeddedServer) listenAddress() string {
-	server := &http.Server{Addr: DefaultAddress}
-	for _, option := range s.options {
-		if option == nil {
-			continue
-		}
-		option(server)
-	}
-	address := strings.TrimSpace(server.Addr)
-	if address == "" {
-		return DefaultAddress
-	}
-	return address
 }
 
 func (s *EmbeddedServer) deploy(ctx context.Context) error {
@@ -259,11 +243,22 @@ func waitServer(ctx context.Context, errCh <-chan error) error {
 	}
 	select {
 	case err := <-errCh:
-		if stderrors.Is(err, context.Canceled) || stderrors.Is(err, http.ErrServerClosed) {
+		if stderrors.Is(err, context.Canceled) {
 			return nil
 		}
 		return err
 	case <-ctx.Done():
 		return arkerrors.Wrap(arkerrors.CodeLifecycle, ctx.Err(), "waiting arkhos server shutdown canceled")
 	}
+}
+
+func closeListener(listener net.Listener) error {
+	if listener == nil {
+		return nil
+	}
+	err := listener.Close()
+	if stderrors.Is(err, net.ErrClosed) {
+		return nil
+	}
+	return err
 }
