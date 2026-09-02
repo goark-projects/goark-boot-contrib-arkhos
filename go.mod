@@ -3,10 +3,10 @@ module goark.dev/gbc-arkhos
 go 1.25
 
 require (
-	goark.dev/arkarta v0.0.2-0.20260828100605-90e141870d91
-	goark.dev/arkhos v0.0.0
-	goark.dev/boot v0.0.0
-	goark.dev/goark v0.0.0
+	goark.dev/arkarta v0.0.2-0.20260829011620-1c7ad55d7f26
+	goark.dev/arkhos v0.0.0-20260828101229-aa65c036881c
+	goark.dev/boot v0.0.0-20260902110755-1bc0082c607a
+	goark.dev/goark v0.0.0-20260829150741-5da2fd1fb184
 )
 
 require (
@@ -41,9 +41,3 @@ require (
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 )
-
-replace goark.dev/arkhos => ../arkhos
-
-replace goark.dev/boot => ../goark-boot
-
-replace goark.dev/goark => ../goark
