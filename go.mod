@@ -3,10 +3,13 @@ module goark.dev/gbc-arkhos
 go 1.25
 
 require (
+	github.com/cloudwego/hertz v0.10.6
 	goark.dev/arkarta v0.0.2-0.20260903014600-5fb9454949e6
 	goark.dev/arkhos v0.0.0-20260903034135-7cd6e58c11a7
 	goark.dev/boot v0.0.0-20260902110755-1bc0082c607a
-	goark.dev/goark v0.0.0-20260829150741-5da2fd1fb184
+	goark.dev/gbc-log v0.0.0-20260903103523-6ce7f0316401
+	goark.dev/goark v0.0.0-20260903021045-47c39724cfc4
+	goark.dev/log v0.0.3-0.20260903102809-61cbe26158d4
 )
 
 require (
@@ -15,7 +18,6 @@ require (
 	github.com/bytedance/sonic/loader v0.5.2 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/cloudwego/gopkg v0.2.0 // indirect
-	github.com/cloudwego/hertz v0.10.6 // indirect
 	github.com/cloudwego/netpoll v0.7.5 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/encoding/javaproperties v0.1.0 // indirect
@@ -30,7 +32,7 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
-	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
@@ -47,4 +49,5 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

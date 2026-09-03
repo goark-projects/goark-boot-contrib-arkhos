@@ -1,12 +1,15 @@
 package gbcarkhos_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,8 +20,11 @@ import (
 	"goark.dev/boot"
 	"goark.dev/boot/configdata"
 	"goark.dev/gbc-arkhos"
+	gbclog "goark.dev/gbc-log"
 	"goark.dev/goark"
 	goarkcontainer "goark.dev/goark/container"
+	coreenv "goark.dev/goark/core/env"
+	goarklog "goark.dev/log"
 )
 
 func TestAutoConfigure_whenDeploymentBeanExists_shouldServeRequest(t *testing.T) {
@@ -89,6 +95,47 @@ goark:
 	body := requestUntilOK(t, server.URL()+"/async-timeout")
 	if body != "timeout" {
 		t.Fatalf("body = %q, want timeout", body)
+	}
+}
+
+func TestAutoConfigure_whenHertzLogs_shouldRouteThroughGoarkLog(t *testing.T) {
+	var output bytes.Buffer
+	app, err := boot.Run(
+		t.Context(),
+		boot.WithAutoConfiguration(
+			gbclog.AutoConfigure(gbclog.WithLoggerContextFactory(loggerFactory(&output))),
+			gbcarkhos.AutoConfigure(gbcarkhos.WithAddress("127.0.0.1:0")),
+		),
+		boot.WithConfiguration(deploymentConfiguration{}),
+	)
+	if err != nil {
+		t.Fatalf("boot run failed: %v", err)
+	}
+	appContext, _ := app.Context()
+	server := goark.MustGet[*gbcarkhos.EmbeddedServer](t.Context(), appContext, gbcarkhos.BeanNameServer)
+	if body := requestUntilOK(t, server.URL()+"/healthz"); body != "UP" {
+		t.Fatalf("body = %q, want UP", body)
+	}
+	if err := app.Close(t.Context()); err != nil {
+		t.Fatalf("close app failed: %v", err)
+	}
+	logs := output.String()
+	for _, expected := range []string{"HTTP server listening", "Begin graceful shutdown", "framework=hertz"} {
+		if !strings.Contains(logs, expected) {
+			t.Fatalf("goark-log output does not contain %q: %s", expected, logs)
+		}
+	}
+	if strings.Contains(logs, "HERTZ:") || strings.Contains(logs, "engine.go:") {
+		t.Fatalf("legacy Hertz output leaked into goark-log: %s", logs)
+	}
+}
+
+func loggerFactory(output *bytes.Buffer) gbclog.LoggerContextFactory {
+	return func(context.Context, coreenv.Environment) (*goarklog.LoggerContext, error) {
+		return goarklog.NewLoggerContext(goarklog.Options{
+			Appenders: []goarklog.Appender{goarklog.NewConsoleAppender(goarklog.WithConsoleWriter(output))},
+			Root:      goarklog.RootLogger{Level: slog.LevelInfo, AppenderRefs: []string{"console"}},
+		})
 	}
 }
 

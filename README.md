@@ -19,8 +19,11 @@ Official Goark Boot starter module for the Arkhos embedded web container.
 - Boot lifecycle integration for start and graceful stop.
 - Server configuration mapping for address, timeouts, header limits, multipart parsing, and Servlet async timeout.
 - A transport-neutral provider boundary based on `arkarta/servlet/container.Container`.
+- Early goark-log auto-configuration and structured Hertz system-log bridging through `slog`.
 
 Hertz is the default embedded implementation. `net/http` remains an explicit Arkhos reference and compatibility implementation; it is not selected implicitly by this starter.
+
+The starter installs `gbc-log` when absent, then routes Hertz logs through the primary `*slog.Logger`. Hertz no longer writes its private format directly to stderr; goark-log owns levels, layouts, appenders, async delivery, and output targets.
 
 ## Container replacement
 
@@ -107,8 +110,11 @@ Goark 官方维护的 Arkhos 嵌入式 Web 容器启动器模块。
 - 接入 Boot 生命周期，支持启动与优雅停止。
 - 映射地址、超时、请求头限制、multipart 和 Servlet async 超时等服务端配置。
 - 基于 `arkarta/servlet/container.Container` 提供与传输实现无关的 Provider 边界。
+- 提前完成 goark-log 自动配置，并通过 `slog` 结构化接管 Hertz 系统日志。
 
 Hertz 是默认嵌入式实现。`net/http` 保留为 Arkhos 显式参考实现和兼容实现，本 starter 不会隐式选择它。
+
+缺少 `gbc-log` 时，本 starter 会先完成日志自动配置，再把 Hertz 日志接入主 `*slog.Logger`。Hertz 不再使用私有格式直接写 stderr；日志级别、布局、Appender、异步投递和输出目标均由 goark-log 管理。
 
 ## 容器替换
 

@@ -2,9 +2,12 @@ package gbcarkhos
 
 import (
 	"context"
+	"log/slog"
 
 	servletcontainer "goark.dev/arkarta/servlet/container"
 	"goark.dev/boot"
+	"goark.dev/gbc-arkhos/internal/hertzlog"
+	gbclog "goark.dev/gbc-log"
 	"goark.dev/goark"
 	goarkcontainer "goark.dev/goark/container"
 	appcontext "goark.dev/goark/context"
@@ -13,7 +16,12 @@ import (
 // AutoConfigure 创建 Arkhos 嵌入式容器自动配置。
 func AutoConfigure(options ...Option) boot.AutoConfiguration {
 	copied := append([]Option(nil), options...)
-	return boot.NewAutoConfiguration(StarterID, func(_ context.Context, app *goark.ApplicationContext) error {
+	return boot.NewAutoConfiguration(StarterID, func(ctx context.Context, app *goark.ApplicationContext) error {
+		if !hasConfiguration(app, gbclog.StarterID+".configuration") {
+			if err := gbclog.AutoConfigure().Configure(ctx, app); err != nil {
+				return err
+			}
+		}
 		return app.RegisterConfiguration(configuration{options: copied})
 	})
 }
@@ -40,6 +48,20 @@ func (c configuration) RegisterWithContext(_ context.Context, config appcontext.
 		return err
 	}
 	provider := resolved.resolvedProvider()
+	if err := goarkcontainer.Register[*hertzlog.Bridge](
+		config.Registry(),
+		BeanNameHertzLogger,
+		func(ctx context.Context, resolver goarkcontainer.Resolver) (*hertzlog.Bridge, error) {
+			logger, err := goark.Get[*slog.Logger](ctx, resolver, gbclog.BeanNameLogger)
+			if err != nil {
+				return nil, err
+			}
+			return hertzlog.Install(logger)
+		},
+		goarkcontainer.WithDependsOn(gbclog.BeanNameLogger),
+	); err != nil {
+		return err
+	}
 	if err := goarkcontainer.Register[servletcontainer.Container](
 		config.Registry(),
 		BeanNameContainer,
@@ -64,5 +86,15 @@ func (c configuration) RegisterWithContext(_ context.Context, config appcontext.
 			return NewEmbeddedServer(container, deployments, provider, resolved.serverConfiguration())
 		},
 		goarkcontainer.WithDependencies(BeanNameContainer),
+		goarkcontainer.WithDependsOn(BeanNameHertzLogger),
 	)
+}
+
+func hasConfiguration(app *appcontext.ApplicationContext, name string) bool {
+	for _, descriptor := range app.Configurations() {
+		if descriptor.Name == name {
+			return true
+		}
+	}
+	return false
 }

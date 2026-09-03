@@ -5,6 +5,8 @@ const (
 	BeanNameContainer = "goark.boot.arkhos.container"
 	// BeanNameServer 是嵌入式 Arkhos HTTP 服务 Bean 的稳定名称。
 	BeanNameServer = "goark.boot.arkhos.server"
+	// BeanNameHertzLogger 是 Hertz 到 slog 的日志桥接 Bean 名称。
+	BeanNameHertzLogger = "goark.boot.arkhos.hertzLogger"
 )
 
 const (
