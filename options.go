@@ -1,6 +1,8 @@
 package gbcarkhos
 
 import (
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -11,7 +13,15 @@ import (
 	arkerrors "goark.dev/goark/errors"
 )
 
-const propertySpringMVCAsyncRequestTimeout = "spring.mvc.async.request-timeout"
+// ShutdownMode 表示嵌入式 HTTP Server 的关闭策略。
+type ShutdownMode string
+
+const (
+	// ShutdownImmediate 立即关闭监听器和活动连接。
+	ShutdownImmediate ShutdownMode = "immediate"
+	// ShutdownGraceful 停止接收新请求并等待在途请求完成。
+	ShutdownGraceful ShutdownMode = "graceful"
+)
 
 // Option 定制 Arkhos 自动配置。
 type Option func(*settings) error
@@ -19,6 +29,7 @@ type Option func(*settings) error
 type settings struct {
 	provider           Provider
 	address            string
+	shutdown           ShutdownMode
 	readTimeout        time.Duration
 	readHeaderTimeout  time.Duration
 	writeTimeout       time.Duration
@@ -117,6 +128,7 @@ func WithAsyncTimeout(timeout time.Duration) Option {
 func newSettings(environment coreenv.Environment, options []Option) (settings, error) {
 	config := settings{
 		address:            DefaultAddress,
+		shutdown:           ShutdownImmediate,
 		maxFormBodySize:    servlet.DefaultMaxFormBodySize,
 		maxRequestBodySize: int(servlet.DefaultMaxFormBodySize),
 	}
@@ -140,6 +152,9 @@ func newSettings(environment coreenv.Environment, options []Option) (settings, e
 func (s settings) validate() error {
 	if s.provider != nil && (len(s.containerOptions) > 0 || len(s.serverOptions) > 0) {
 		return arkerrors.New(arkerrors.CodeInvalidArgument, "custom provider cannot use Hertz-specific options")
+	}
+	if s.shutdown != ShutdownImmediate && s.shutdown != ShutdownGraceful {
+		return arkerrors.Newf(arkerrors.CodeInvalidArgument, "unsupported server shutdown mode %q", s.shutdown)
 	}
 	return nil
 }
@@ -178,6 +193,7 @@ func (s settings) containerConfiguration() ContainerConfiguration {
 func (s settings) serverConfiguration() ServerConfiguration {
 	return ServerConfiguration{
 		Address:            s.address,
+		Shutdown:           s.shutdown,
 		ReadTimeout:        s.readTimeout,
 		ReadHeaderTimeout:  s.readHeaderTimeout,
 		WriteTimeout:       s.writeTimeout,
@@ -191,27 +207,28 @@ func (s *settings) applyEnvironment(environment coreenv.Environment) error {
 	if environment == nil {
 		return nil
 	}
-	if value, ok := environment.GetProperty(PropertyServerAddress); ok {
-		if err := WithAddress(value)(s); err != nil {
-			return err
-		}
-	}
-	if err := readDuration(environment, PropertyServerReadTimeout, &s.readTimeout); err != nil {
+	if err := s.readAddress(environment); err != nil {
 		return err
 	}
-	if err := readDuration(environment, PropertyServerReadHeaderTimeout, &s.readHeaderTimeout); err != nil {
+	if value, ok := environment.GetProperty(PropertyServerShutdown); ok {
+		s.shutdown = ShutdownMode(strings.ToLower(strings.TrimSpace(value)))
+	}
+	if err := readDurationFirstInto(environment, &s.readTimeout, PropertyHertzReadTimeout); err != nil {
 		return err
 	}
-	if err := readDuration(environment, PropertyServerWriteTimeout, &s.writeTimeout); err != nil {
+	if err := readDurationFirstInto(environment, &s.readHeaderTimeout, PropertyHertzReadHeaderTimeout); err != nil {
 		return err
 	}
-	if err := readDuration(environment, PropertyServerIdleTimeout, &s.idleTimeout); err != nil {
+	if err := readDurationFirstInto(environment, &s.writeTimeout, PropertyHertzWriteTimeout); err != nil {
 		return err
 	}
-	if err := readInt(environment, PropertyServerMaxHeaderBytes, &s.maxHeaderBytes); err != nil {
+	if err := readDurationFirstInto(environment, &s.idleTimeout, PropertyHertzIdleTimeout); err != nil {
 		return err
 	}
-	if err := readByteSize(environment, PropertyServerMaxRequestBodySize, &s.maxRequestBodySize); err != nil {
+	if err := readIntFirst(environment, &s.maxHeaderBytes, PropertyServerMaxHTTPHeaderSize, PropertyHertzMaxHeaderBytes); err != nil {
+		return err
+	}
+	if err := readByteSizeFirst(environment, &s.maxRequestBodySize, PropertyHertzMaxRequestBodySize); err != nil {
 		return err
 	}
 	if err := readByteSize64(environment, PropertyFormMaxBodySize, &s.maxFormBodySize); err != nil {
@@ -223,22 +240,51 @@ func (s *settings) applyEnvironment(environment coreenv.Environment) error {
 	return s.readAsync(environment)
 }
 
+func (s *settings) readAddress(environment coreenv.Environment) error {
+	host, hostSet := environment.GetProperty(PropertyServerAddress)
+	port, portSet, err := readPort(environment, PropertyServerPort)
+	if err != nil {
+		return err
+	}
+	if hostSet || portSet {
+		if !portSet {
+			port = 8080
+		}
+		s.address = net.JoinHostPort(strings.TrimSpace(host), strconv.Itoa(port))
+		return nil
+	}
+	return nil
+}
+
 func (s *settings) readMultipart(environment coreenv.Environment) error {
-	if value, ok := environment.GetProperty(PropertyMultipartLocation); ok {
+	explicitlyDisabled := false
+	if value, ok, err := readBoolFirst(environment, PropertyMultipartEnabled); err != nil {
+		return err
+	} else if ok {
+		s.multipart.enabled = value
+		explicitlyDisabled = !value
+	}
+	if value, ok := firstString(environment, PropertyMultipartLocation); ok {
 		s.multipart.enabled = true
 		s.multipart.location = value
 	}
-	if err := readInt64(environment, PropertyMultipartMaxFileSize, &s.multipart.maxFileSize, &s.multipart.enabled); err != nil {
+	if err := readByteSize64First(environment, &s.multipart.maxFileSize, &s.multipart.enabled, PropertyMultipartMaxFileSize); err != nil {
 		return err
 	}
-	if err := readInt64(environment, PropertyMultipartMaxRequestSize, &s.multipart.maxRequestSize, &s.multipart.enabled); err != nil {
+	if err := readByteSize64First(environment, &s.multipart.maxRequestSize, &s.multipart.enabled, PropertyMultipartMaxRequestSize); err != nil {
 		return err
 	}
-	return readInt64(environment, PropertyMultipartFileSizeThreshold, &s.multipart.fileSizeThreshold, &s.multipart.enabled)
+	if err := readByteSize64First(environment, &s.multipart.fileSizeThreshold, &s.multipart.enabled, PropertyMultipartFileSizeThreshold); err != nil {
+		return err
+	}
+	if explicitlyDisabled {
+		s.multipart.enabled = false
+	}
+	return nil
 }
 
 func (s *settings) readAsync(environment coreenv.Environment) error {
-	timeout, ok, err := readDurationFirst(environment, PropertyAsyncTimeout, propertySpringMVCAsyncRequestTimeout)
+	timeout, ok, err := readDurationFirst(environment, PropertyAsyncTimeout)
 	if err != nil {
 		return err
 	}
@@ -256,6 +302,17 @@ func readDuration(environment coreenv.Environment, key string, target *time.Dura
 	value, ok, err := coreenv.GetPropertyAsValue[time.Duration](environment, key)
 	if err != nil {
 		return arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read duration property %q", key)
+	}
+	if ok {
+		*target = value
+	}
+	return nil
+}
+
+func readDurationFirstInto(environment coreenv.Environment, target *time.Duration, keys ...string) error {
+	value, ok, err := readDurationFirst(environment, keys...)
+	if err != nil {
+		return err
 	}
 	if ok {
 		*target = value
@@ -285,6 +342,56 @@ func readInt(environment coreenv.Environment, key string, target *int) error {
 		*target = value
 	}
 	return nil
+}
+
+func readIntFirst(environment coreenv.Environment, target *int, keys ...string) error {
+	for _, key := range keys {
+		value, ok, err := coreenv.GetPropertyAsValue[int](environment, key)
+		if err != nil {
+			return arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read int property %q", key)
+		}
+		if ok {
+			*target = value
+			return nil
+		}
+	}
+	return nil
+}
+
+func readPort(environment coreenv.Environment, key string) (int, bool, error) {
+	value, ok, err := coreenv.GetPropertyAsValue[int](environment, key)
+	if err != nil {
+		return 0, false, arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read port property %q", key)
+	}
+	if !ok {
+		return 0, false, nil
+	}
+	if value < 0 || value > 65535 {
+		return 0, false, arkerrors.Newf(arkerrors.CodeInvalidArgument, "port property %q must be between 0 and 65535", key)
+	}
+	return value, true, nil
+}
+
+func readBoolFirst(environment coreenv.Environment, keys ...string) (bool, bool, error) {
+	for _, key := range keys {
+		value, ok, err := coreenv.GetPropertyAsValue[bool](environment, key)
+		if err != nil {
+			return false, false, arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read bool property %q", key)
+		}
+		if ok {
+			return value, true, nil
+		}
+	}
+	return false, false, nil
+}
+
+func firstString(environment coreenv.Environment, keys ...string) (string, bool) {
+	for _, key := range keys {
+		if value, ok := environment.GetProperty(key); ok {
+			return value, true
+		}
+	}
+	return "", false
 }
 
 func readInt64(environment coreenv.Environment, key string, target *int64, found *bool) error {

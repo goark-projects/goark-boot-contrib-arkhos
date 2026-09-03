@@ -30,10 +30,9 @@ import (
 func TestAutoConfigure_whenDeploymentBeanExists_shouldServeRequest(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "app.yml"), `
-goark:
-  web:
-    server:
-      address: 127.0.0.1:0
+server:
+  address: 127.0.0.1
+  port: 0
 `)
 
 	app, err := boot.Run(
@@ -64,13 +63,13 @@ goark:
 func TestAutoConfigure_whenAsyncTimeoutConfigured_shouldApplyContainerAsyncTimeout(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "app.yml"), `
+server:
+  address: 127.0.0.1
+  port: 0
 goark:
-  web:
-    server:
-      address: 127.0.0.1:0
-    servlet:
-      async:
-        timeout: 10ms
+  mvc:
+    async:
+      request-timeout: 10ms
 `)
 
 	app, err := boot.Run(
@@ -120,7 +119,7 @@ func TestAutoConfigure_whenHertzLogs_shouldRouteThroughGoarkLog(t *testing.T) {
 		t.Fatalf("close app failed: %v", err)
 	}
 	logs := output.String()
-	for _, expected := range []string{"HTTP server listening", "Begin graceful shutdown", "g.d.arkhos.hertz"} {
+	for _, expected := range []string{"HTTP server listening", "g.d.arkhos.hertz"} {
 		if !strings.Contains(logs, expected) {
 			t.Fatalf("goark-log output does not contain %q: %s", expected, logs)
 		}

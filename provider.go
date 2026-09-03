@@ -17,6 +17,7 @@ type ManagedServer interface {
 	Address() string
 	Serve(ctx context.Context, listener net.Listener) error
 	Shutdown(ctx context.Context) error
+	Close() error
 }
 
 // ContainerConfiguration 描述与容器实现无关的 Servlet 配置。
@@ -30,6 +31,7 @@ type ContainerConfiguration struct {
 // ServerConfiguration 描述与容器实现无关的网络服务配置。
 type ServerConfiguration struct {
 	Address            string
+	Shutdown           ShutdownMode
 	ReadTimeout        time.Duration
 	ReadHeaderTimeout  time.Duration
 	WriteTimeout       time.Duration

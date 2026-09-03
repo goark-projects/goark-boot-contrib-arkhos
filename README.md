@@ -1,39 +1,29 @@
 # Goark Boot Contrib Arkhos
 
-Official Goark Boot starter module for the Arkhos embedded web container.
+Official Goark Boot starter for the Arkhos embedded web container.
 
 ## Module
 
-- Module path: `goark.dev/gbc-arkhos`
+- Module: `goark.dev/gbc-arkhos`
 - Repository: `github.com/goark-projects/goark-boot-contrib-arkhos`
 - License: Apache-2.0
-- Default branch: `main`
-- Development branch: `dev`
+- Default branch: `dev`
 
-## Scope
+## Responsibilities
 
-`goark.dev/gbc-arkhos` is the Goark-managed Arkhos starter. It is intended to provide the Spring Boot embedded Tomcat starter equivalent for the Goark ecosystem:
+This module owns the integration between Goark Boot, Arkarta Servlet, and an
+Arkhos transport implementation:
 
-- Arkhos embedded container bootstrap.
-- Arkarta servlet deployment binding.
-- Boot lifecycle integration for start and graceful stop.
-- Server configuration mapping for address, timeouts, header limits, multipart parsing, and Servlet async timeout.
-- A transport-neutral provider boundary based on `arkarta/servlet/container.Container`.
-- Early goark-log auto-configuration and structured Hertz system-log bridging through `slog`.
+- Creates and configures the embedded Servlet container.
+- Binds Arkarta deployments to the container.
+- Starts and stops the HTTP server through the Boot lifecycle.
+- Maps generic `server.*`, Servlet, MVC, and Hertz-specific properties.
+- Installs `gbc-log` early and routes Hertz system logs through `slog`.
+- Exposes a transport-neutral `Provider` contract for alternative servers.
 
-Hertz is the default embedded implementation. `net/http` remains an explicit Arkhos reference and compatibility implementation; it is not selected implicitly by this starter.
-
-The starter installs `gbc-log` when absent, then routes Hertz logs through the primary `*slog.Logger`. Hertz no longer writes its private format directly to stderr; goark-log owns levels, layouts, appenders, async delivery, and output targets.
-
-## Container replacement
-
-Application deployments depend only on Arkarta contracts. A future gnet or fasthttp starter must expose the same call shape:
-
-```go
-boot.WithAutoConfiguration(containerstarter.AutoConfigure())
-```
-
-Replacing the container changes the starter module/import only. Business handlers, Arkarta deployments, configuration property names, and the `AutoConfigure()` call remain unchanged. Go cannot activate a module that is only present in `go.mod` and never imported, so dependency-only runtime discovery is intentionally not used.
+Hertz is the default provider. A custom provider implements `Provider` and
+returns a `ManagedServer`. `ManagedServer.Close` performs immediate termination;
+`ManagedServer.Shutdown` performs context-bounded graceful termination.
 
 ## Usage
 
@@ -44,11 +34,12 @@ import (
 	"context"
 
 	"goark.dev/boot"
-	"goark.dev/gbc-arkhos"
+	gbcarkhos "goark.dev/gbc-arkhos"
 )
 
 func main() {
-	app, err := boot.Run(context.Background(),
+	app, err := boot.Run(
+		context.Background(),
 		boot.WithAutoConfiguration(gbcarkhos.AutoConfigure()),
 	)
 	if err != nil {
@@ -58,101 +49,142 @@ func main() {
 }
 ```
 
-Application code usually uses `goark.dev/gbc-web`, which includes this starter by default.
-Use this module directly when you need the embedded Arkhos container with manually supplied Arkarta Servlet deployments.
+Applications normally import `goark.dev/gbc-web`, which includes this starter.
+Use this module directly when supplying Arkarta Servlet deployments manually.
 
-## Configuration Properties
+## Configuration
+
+### Generic Server
 
 | Property | Default | Description |
 | --- | --- | --- |
-| `goark.web.server.address` | `:8080` | TCP listen address passed to Arkhos. |
-| `goark.web.server.read-timeout` | unset | Full request read timeout, parsed as Go duration. |
-| `goark.web.server.read-header-timeout` | unset | Request header read timeout, parsed as Go duration. |
-| `goark.web.server.write-timeout` | unset | Response write timeout, parsed as Go duration. |
-| `goark.web.server.idle-timeout` | unset | Keep-alive idle timeout, parsed as Go duration. |
-| `goark.web.server.max-header-bytes` | unset | Maximum HTTP header bytes. |
-| `goark.web.server.max-request-body-size` | `10MiB` | Maximum complete HTTP request body size. |
-| `goark.web.servlet.form.max-body-size` | `10MiB` | Maximum URL-encoded form body size. |
-| `goark.web.servlet.multipart.location` | unset | Temporary directory for multipart files. |
-| `goark.web.servlet.multipart.max-file-size` | unset | Maximum single uploaded file size in bytes. |
-| `goark.web.servlet.multipart.max-request-size` | unset | Maximum multipart request size in bytes. |
-| `goark.web.servlet.multipart.file-size-threshold` | unset | In-memory threshold before multipart data spills to disk. |
-| `goark.web.servlet.async.timeout` | unset | Default Servlet async timeout, parsed as Go duration. |
+| `server.address` | all interfaces | Listen host or IP address |
+| `server.port` | `8080` | Listen port; `0` selects an ephemeral port |
+| `server.shutdown` | `immediate` | `immediate` or `graceful` |
+| `server.max-http-request-header-size` | provider default | Maximum HTTP request header size |
 
-`spring.mvc.async.request-timeout` is accepted as a Spring-compatible alias for `goark.web.servlet.async.timeout`.
+### Hertz
+
+| Property | Default | Description |
+| --- | --- | --- |
+| `server.hertz.read-timeout` | unset | Full request read timeout |
+| `server.hertz.read-header-timeout` | unset | Header timeout used when read timeout is unset |
+| `server.hertz.write-timeout` | unset | Response write timeout |
+| `server.hertz.idle-timeout` | unset | Keep-alive idle timeout |
+| `server.hertz.max-header-bytes` | unset | Hertz-specific header limit |
+| `server.hertz.max-request-body-size` | `10MiB` | Complete request body limit |
+
+The generic header limit takes precedence over the Hertz-specific header limit.
+
+### Servlet And MVC
+
+| Property | Default | Description |
+| --- | --- | --- |
+| `goark.servlet.form.max-body-size` | `10MiB` | URL-encoded form body limit |
+| `goark.servlet.multipart.enabled` | `false` | Enables multipart parsing |
+| `goark.servlet.multipart.location` | unset | Multipart temporary directory |
+| `goark.servlet.multipart.max-file-size` | unset | Single uploaded file limit |
+| `goark.servlet.multipart.max-request-size` | unset | Complete multipart request limit |
+| `goark.servlet.multipart.file-size-threshold` | unset | In-memory threshold before spilling to disk |
+| `goark.mvc.async.request-timeout` | unset | Default Servlet asynchronous request timeout |
+
+Size values are case-insensitive and use binary multiples. Supported suffixes
+are `B`, `K`, `KB`, `KiB`, `M`, `MB`, `MiB`, `G`, `GB`, `GiB`, `T`, `TB`,
+`TiB`, `P`, `PB`, and `PiB`. `0` and the unlimited sentinel `-1` are accepted.
+
+```yaml
+server:
+  address: 127.0.0.1
+  port: 8080
+  shutdown: graceful
+  max-http-request-header-size: 16K
+  hertz:
+    read-header-timeout: 5s
+    max-request-body-size: 20M
+
+goark:
+  servlet:
+    form:
+      max-body-size: 10M
+    multipart:
+      enabled: true
+      max-file-size: 10M
+      max-request-size: 20M
+  mvc:
+    async:
+      request-timeout: 30s
+```
 
 ## Development
 
 ```bash
 go test ./...
+go test -race ./...
+go vet ./...
 ```
 
-## Chinese
+## 中文
 
 # Goark Boot Contrib Arkhos（中文）
 
-Goark 官方维护的 Arkhos 嵌入式 Web 容器启动器模块。
-
-## 模块信息
-
-- 模块路径：`goark.dev/gbc-arkhos`
-- 仓库地址：`github.com/goark-projects/goark-boot-contrib-arkhos`
-- 开源协议：Apache-2.0
-- 默认分支：`main`
-- 开发分支：`dev`
+Goark 官方维护的 Arkhos 嵌入式 Web 容器启动器。
 
 ## 职责边界
 
-`goark.dev/gbc-arkhos` 是 Goark 生态中对标 Spring Boot 嵌入式 Tomcat 启动器的官方模块：
+本模块负责 Goark Boot、Arkarta Servlet 与 Arkhos 传输实现之间的集成：
 
-- 启动 Arkhos 嵌入式容器。
-- 绑定 Arkarta Servlet 部署模型。
-- 接入 Boot 生命周期，支持启动与优雅停止。
-- 映射地址、超时、请求头限制、multipart 和 Servlet async 超时等服务端配置。
-- 基于 `arkarta/servlet/container.Container` 提供与传输实现无关的 Provider 边界。
-- 提前完成 goark-log 自动配置，并通过 `slog` 结构化接管 Hertz 系统日志。
+- 创建并配置嵌入式 Servlet 容器。
+- 将 Arkarta Deployment 部署到容器。
+- 通过 Boot 生命周期启动和停止 HTTP 服务。
+- 映射通用 `server.*`、Servlet、MVC 与 Hertz 专属配置。
+- 提前安装 `gbc-log`，并通过 `slog` 接管 Hertz 系统日志。
+- 提供与传输实现无关的 `Provider` 扩展契约。
 
-Hertz 是默认嵌入式实现。`net/http` 保留为 Arkhos 显式参考实现和兼容实现，本 starter 不会隐式选择它。
+Hertz 是默认 Provider。自定义 Provider 返回 `ManagedServer`：`Close` 负责
+立即终止，`Shutdown` 负责受 Context 截止时间约束的优雅关闭。
 
-缺少 `gbc-log` 时，本 starter 会先完成日志自动配置，再把 Hertz 日志接入主 `*slog.Logger`。Hertz 不再使用私有格式直接写 stderr；日志级别、布局、Appender、异步投递和输出目标均由 goark-log 管理。
+## 配置
 
-## 容器替换
-
-业务 Deployment 只依赖 Arkarta 标准契约。未来 gnet 或 fasthttp starter 必须提供相同调用形态：
-
-```go
-boot.WithAutoConfiguration(containerstarter.AutoConfigure())
-```
-
-替换容器时只修改 starter 模块依赖和 import；业务 Handler、Arkarta Deployment、配置属性名以及 `AutoConfigure()` 调用均保持不变。Go 不会链接仅写入 `go.mod` 而未被 import 的模块，因此不采用不可靠的纯依赖运行时发现机制。
-
-## 使用方式
-
-业务应用通常直接使用 `goark.dev/gbc-web`，它会默认包含 Arkhos 嵌入式容器。
-只有在需要手工提供 Arkarta Servlet 部署对象时，才直接使用本模块。
-
-## 配置属性
+通用服务端配置：
 
 | 属性 | 默认值 | 说明 |
 | --- | --- | --- |
-| `goark.web.server.address` | `:8080` | Arkhos TCP 监听地址。 |
-| `goark.web.server.read-timeout` | 未设置 | 完整请求读取超时，按 Go duration 解析。 |
-| `goark.web.server.read-header-timeout` | 未设置 | 请求头读取超时，按 Go duration 解析。 |
-| `goark.web.server.write-timeout` | 未设置 | 响应写出超时，按 Go duration 解析。 |
-| `goark.web.server.idle-timeout` | 未设置 | keep-alive 空闲超时，按 Go duration 解析。 |
-| `goark.web.server.max-header-bytes` | 未设置 | HTTP 请求头最大字节数。 |
-| `goark.web.server.max-request-body-size` | `10MiB` | 完整 HTTP 请求体最大值。 |
-| `goark.web.servlet.form.max-body-size` | `10MiB` | URL 编码表单请求体最大值。 |
-| `goark.web.servlet.multipart.location` | 未设置 | multipart 临时文件目录。 |
-| `goark.web.servlet.multipart.max-file-size` | 未设置 | 单个上传文件最大字节数。 |
-| `goark.web.servlet.multipart.max-request-size` | 未设置 | multipart 请求最大字节数。 |
-| `goark.web.servlet.multipart.file-size-threshold` | 未设置 | multipart 数据落盘前的内存阈值。 |
-| `goark.web.servlet.async.timeout` | 未设置 | Servlet async 默认超时，按 Go duration 解析。 |
+| `server.address` | 所有网卡 | 监听主机或 IP 地址 |
+| `server.port` | `8080` | 监听端口；`0` 表示随机可用端口 |
+| `server.shutdown` | `immediate` | `immediate` 或 `graceful` |
+| `server.max-http-request-header-size` | Provider 默认值 | HTTP 请求头最大值 |
 
-`spring.mvc.async.request-timeout` 可作为 `goark.web.servlet.async.timeout` 的 Spring 兼容别名。
+Hertz 专属配置：
+
+| 属性 | 默认值 | 说明 |
+| --- | --- | --- |
+| `server.hertz.read-timeout` | 未设置 | 完整请求读取超时 |
+| `server.hertz.read-header-timeout` | 未设置 | 未配置读取超时时使用的请求头超时 |
+| `server.hertz.write-timeout` | 未设置 | 响应写出超时 |
+| `server.hertz.idle-timeout` | 未设置 | keep-alive 空闲超时 |
+| `server.hertz.max-header-bytes` | 未设置 | Hertz 专属请求头限制 |
+| `server.hertz.max-request-body-size` | `10MiB` | 完整请求体限制 |
+
+Servlet 与 MVC 配置：
+
+| 属性 | 默认值 | 说明 |
+| --- | --- | --- |
+| `goark.servlet.form.max-body-size` | `10MiB` | URL 编码表单体限制 |
+| `goark.servlet.multipart.enabled` | `false` | 是否启用 multipart 解析 |
+| `goark.servlet.multipart.location` | 未设置 | multipart 临时目录 |
+| `goark.servlet.multipart.max-file-size` | 未设置 | 单个上传文件限制 |
+| `goark.servlet.multipart.max-request-size` | 未设置 | multipart 请求总大小限制 |
+| `goark.servlet.multipart.file-size-threshold` | 未设置 | multipart 数据落盘前的内存阈值 |
+| `goark.mvc.async.request-timeout` | 未设置 | Servlet 异步请求默认超时 |
+
+大小单位不区分大小写，采用 1024 进制，支持 `B`、`K/KB/KiB`、
+`M/MB/MiB`、`G/GB/GiB`、`T/TB/TiB`、`P/PB/PiB`，并接受 `0` 与表示
+无限制的 `-1`。
 
 ## 开发
 
 ```bash
 go test ./...
+go test -race ./...
+go vet ./...
 ```

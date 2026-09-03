@@ -84,6 +84,42 @@ func TestEmbeddedServerStartThenImmediateClose_shouldNotBlock(t *testing.T) {
 	}
 }
 
+func TestEmbeddedServerStop_whenShutdownModeConfigured_shouldUseMatchingOperation(t *testing.T) {
+	tests := []struct {
+		name         string
+		mode         ShutdownMode
+		wantShutdown int
+		wantClose    int
+	}{
+		{name: "immediate", mode: ShutdownImmediate, wantClose: 1},
+		{name: "graceful", mode: ShutdownGraceful, wantShutdown: 1},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			container := &providerTestContainer{}
+			managed := newProviderTestServer()
+			provider := &providerTestProvider{container: container, server: managed}
+			server, err := NewEmbeddedServer(container, nil, provider, ServerConfiguration{
+				Address:  "127.0.0.1:0",
+				Shutdown: test.mode,
+			})
+			if err != nil {
+				t.Fatalf("new embedded server failed: %v", err)
+			}
+			if err := server.Start(t.Context()); err != nil {
+				t.Fatalf("start server failed: %v", err)
+			}
+			if err := server.Stop(t.Context()); err != nil {
+				t.Fatalf("stop server failed: %v", err)
+			}
+			shutdownCalls, closeCalls := managed.calls()
+			if shutdownCalls != test.wantShutdown || closeCalls != test.wantClose {
+				t.Fatalf("calls = shutdown:%d close:%d, want shutdown:%d close:%d", shutdownCalls, closeCalls, test.wantShutdown, test.wantClose)
+			}
+		})
+	}
+}
+
 type nilServerProvider struct{}
 
 func (nilServerProvider) Name() string {

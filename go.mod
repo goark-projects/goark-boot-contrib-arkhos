@@ -5,10 +5,10 @@ go 1.25
 require (
 	github.com/cloudwego/hertz v0.10.6
 	goark.dev/arkarta v0.0.2-0.20260903014600-5fb9454949e6
-	goark.dev/arkhos v0.0.0-20260903114123-7f5757974998
+	goark.dev/arkhos v0.0.0-20260903135510-cdcb8459ab74
 	goark.dev/boot v0.0.0-20260902110755-1bc0082c607a
 	goark.dev/gbc-log v0.0.0-20260903130207-3ccbc73f3834
-	goark.dev/goark v0.0.0-20260903021045-47c39724cfc4
+	goark.dev/goark v0.0.0-20260903134136-40d079352f43
 	goark.dev/log v0.0.3-0.20260903130032-7307f7e86ccc
 )
 

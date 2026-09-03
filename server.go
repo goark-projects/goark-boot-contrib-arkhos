@@ -60,6 +60,12 @@ func NewEmbeddedServer(container servletcontainer.Container, deployments []*serv
 	if provider == nil {
 		return nil, arkerrors.New(arkerrors.CodeInvalidArgument, "arkhos provider is nil")
 	}
+	if config.Shutdown == "" {
+		config.Shutdown = ShutdownImmediate
+	}
+	if config.Shutdown != ShutdownImmediate && config.Shutdown != ShutdownGraceful {
+		return nil, arkerrors.Newf(arkerrors.CodeInvalidArgument, "unsupported server shutdown mode %q", config.Shutdown)
+	}
 	return &EmbeddedServer{
 		container:   container,
 		deployments: append([]*servletcontainer.Deployment(nil), deployments...),
@@ -141,7 +147,12 @@ func (s *EmbeddedServer) Stop(ctx context.Context) error {
 	if err != nil || !stop {
 		return err
 	}
-	shutdownErr := server.Shutdown(ctx)
+	var shutdownErr error
+	if s.config.Shutdown == ShutdownImmediate {
+		shutdownErr = server.Close()
+	} else {
+		shutdownErr = server.Shutdown(ctx)
+	}
 	serveErr := waitServer(ctx, errCh)
 	listenerErr := closeListener(listener)
 	s.finishStop()

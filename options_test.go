@@ -31,13 +31,15 @@ func TestNewSettings_whenEnvironmentIsNil_shouldUseSafeDefaults(t *testing.T) {
 
 func TestNewSettings_whenEnvironmentPropertiesExist_shouldApplyServerProperties(t *testing.T) {
 	environment := newTestEnvironment(t, map[string]any{
-		PropertyServerAddress:              "127.0.0.1:0",
-		PropertyServerReadTimeout:          "2s",
-		PropertyServerReadHeaderTimeout:    "150ms",
-		PropertyServerWriteTimeout:         "3s",
-		PropertyServerIdleTimeout:          "4s",
-		PropertyServerMaxHeaderBytes:       "8192",
-		PropertyServerMaxRequestBodySize:   "20MiB",
+		PropertyServerAddress:              "127.0.0.1",
+		PropertyServerPort:                 "0",
+		PropertyServerShutdown:             "graceful",
+		PropertyHertzReadTimeout:           "2s",
+		PropertyHertzReadHeaderTimeout:     "150ms",
+		PropertyHertzWriteTimeout:          "3s",
+		PropertyHertzIdleTimeout:           "4s",
+		PropertyServerMaxHTTPHeaderSize:    "8192",
+		PropertyHertzMaxRequestBodySize:    "20MiB",
 		PropertyFormMaxBodySize:            "10MiB",
 		PropertyAsyncTimeout:               "250ms",
 		PropertyMultipartLocation:          "tmp/uploads",
@@ -53,6 +55,9 @@ func TestNewSettings_whenEnvironmentPropertiesExist_shouldApplyServerProperties(
 
 	if settings.address != "127.0.0.1:0" {
 		t.Fatalf("address = %q", settings.address)
+	}
+	if settings.shutdown != ShutdownGraceful {
+		t.Fatalf("shutdown = %q, want graceful", settings.shutdown)
 	}
 	if settings.readTimeout != 2*time.Second {
 		t.Fatalf("read timeout = %s", settings.readTimeout)
@@ -90,7 +95,8 @@ func TestNewSettings_whenEnvironmentPropertiesExist_shouldApplyServerProperties(
 
 func TestNewSettings_whenOptionOverridesEnvironment_shouldUseOptionValue(t *testing.T) {
 	environment := newTestEnvironment(t, map[string]any{
-		PropertyServerAddress: ":8080",
+		PropertyServerAddress: "127.0.0.1",
+		PropertyServerPort:    "8080",
 	})
 
 	settings, err := newSettings(environment, []Option{WithAddress("127.0.0.1:0")})
@@ -103,9 +109,9 @@ func TestNewSettings_whenOptionOverridesEnvironment_shouldUseOptionValue(t *test
 	}
 }
 
-func TestNewSettings_whenSpringAsyncAliasExists_shouldApplyAsyncTimeout(t *testing.T) {
+func TestNewSettings_whenMVCAsyncTimeoutExists_shouldApplyAsyncTimeout(t *testing.T) {
 	environment := newTestEnvironment(t, map[string]any{
-		propertySpringMVCAsyncRequestTimeout: "75ms",
+		PropertyAsyncTimeout: "75ms",
 	})
 
 	settings, err := newSettings(environment, nil)
@@ -134,12 +140,40 @@ func TestNewSettings_whenAddressIsBlank_shouldReturnError(t *testing.T) {
 
 func TestNewSettings_whenDurationIsInvalid_shouldReturnError(t *testing.T) {
 	environment := newTestEnvironment(t, map[string]any{
-		PropertyServerReadTimeout: "not-a-duration",
+		PropertyHertzReadTimeout: "not-a-duration",
 	})
 
 	_, err := newSettings(environment, nil)
 	if err == nil {
 		t.Fatal("expected duration conversion error")
+	}
+}
+
+func TestNewSettings_whenPortIsOutOfRange_shouldReturnError(t *testing.T) {
+	environment := newTestEnvironment(t, map[string]any{PropertyServerPort: "65536"})
+	if _, err := newSettings(environment, nil); err == nil {
+		t.Fatal("expected invalid port error")
+	}
+}
+
+func TestNewSettings_whenShutdownModeIsInvalid_shouldReturnError(t *testing.T) {
+	environment := newTestEnvironment(t, map[string]any{PropertyServerShutdown: "unknown"})
+	if _, err := newSettings(environment, nil); err == nil {
+		t.Fatal("expected invalid shutdown mode error")
+	}
+}
+
+func TestNewSettings_whenMultipartIsExplicitlyDisabled_shouldRemainDisabled(t *testing.T) {
+	environment := newTestEnvironment(t, map[string]any{
+		PropertyMultipartEnabled:     "false",
+		PropertyMultipartMaxFileSize: "10M",
+	})
+	settings, err := newSettings(environment, nil)
+	if err != nil {
+		t.Fatalf("new settings failed: %v", err)
+	}
+	if settings.multipart.enabled {
+		t.Fatal("multipart should remain disabled")
 	}
 }
 

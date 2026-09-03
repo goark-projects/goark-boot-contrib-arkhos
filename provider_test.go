@@ -100,10 +100,13 @@ func (c *providerTestContainer) Shutdown(context.Context) error {
 }
 
 type providerTestServer struct {
-	container servletcontainer.Container
-	started   chan struct{}
-	shutdown  chan struct{}
-	once      sync.Once
+	container     servletcontainer.Container
+	started       chan struct{}
+	shutdown      chan struct{}
+	once          sync.Once
+	mu            sync.Mutex
+	shutdownCalls int
+	closeCalls    int
 }
 
 func newProviderTestServer() *providerTestServer {
@@ -131,6 +134,23 @@ func (s *providerTestServer) Serve(ctx context.Context, listener net.Listener) e
 }
 
 func (s *providerTestServer) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	s.shutdownCalls++
+	s.mu.Unlock()
 	s.once.Do(func() { close(s.shutdown) })
 	return s.container.Shutdown(ctx)
+}
+
+func (s *providerTestServer) Close() error {
+	s.mu.Lock()
+	s.closeCalls++
+	s.mu.Unlock()
+	s.once.Do(func() { close(s.shutdown) })
+	return s.container.Shutdown(context.Background())
+}
+
+func (s *providerTestServer) calls() (shutdown int, close int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.shutdownCalls, s.closeCalls
 }

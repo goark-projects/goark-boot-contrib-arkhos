@@ -15,39 +15,45 @@ const (
 )
 
 const (
-	// PropertyServerAddress 设置嵌入式 Web 服务监听地址。
-	PropertyServerAddress = "goark.web.server.address"
-	// PropertyServerReadTimeout 设置完整请求读取超时。
-	PropertyServerReadTimeout = "goark.web.server.read-timeout"
-	// PropertyServerReadHeaderTimeout 设置请求头读取超时。
-	PropertyServerReadHeaderTimeout = "goark.web.server.read-header-timeout"
-	// PropertyServerWriteTimeout 设置响应写出超时。
-	PropertyServerWriteTimeout = "goark.web.server.write-timeout"
-	// PropertyServerIdleTimeout 设置 keep-alive 空闲超时。
-	PropertyServerIdleTimeout = "goark.web.server.idle-timeout"
-	// PropertyServerMaxHeaderBytes 设置请求头最大字节数。
-	PropertyServerMaxHeaderBytes = "goark.web.server.max-header-bytes"
-	// PropertyServerMaxRequestBodySize 设置整个 HTTP 请求体最大字节数。
-	PropertyServerMaxRequestBodySize = "goark.web.server.max-request-body-size"
+	// PropertyServerAddress 设置监听主机。
+	PropertyServerAddress = "server.address"
+	// PropertyServerPort 设置监听端口。
+	PropertyServerPort = "server.port"
+	// PropertyServerShutdown 设置服务关闭模式，支持 immediate 和 graceful。
+	PropertyServerShutdown = "server.shutdown"
+	// PropertyServerMaxHTTPHeaderSize 设置 HTTP 请求头最大字节数。
+	PropertyServerMaxHTTPHeaderSize = "server.max-http-request-header-size"
+	// PropertyHertzReadTimeout 设置 Hertz 完整请求读取超时。
+	PropertyHertzReadTimeout = "server.hertz.read-timeout"
+	// PropertyHertzReadHeaderTimeout 设置 Hertz 请求头读取超时。
+	PropertyHertzReadHeaderTimeout = "server.hertz.read-header-timeout"
+	// PropertyHertzWriteTimeout 设置 Hertz 响应写出超时。
+	PropertyHertzWriteTimeout = "server.hertz.write-timeout"
+	// PropertyHertzIdleTimeout 设置 Hertz keep-alive 空闲超时。
+	PropertyHertzIdleTimeout = "server.hertz.idle-timeout"
+	// PropertyHertzMaxHeaderBytes 设置 Hertz 请求头最大字节数。
+	PropertyHertzMaxHeaderBytes = "server.hertz.max-header-bytes"
+	// PropertyHertzMaxRequestBodySize 设置 Hertz 请求体最大字节数。
+	PropertyHertzMaxRequestBodySize = "server.hertz.max-request-body-size"
 )
 
 const (
-	// PropertyFormMaxBodySize 设置 URL 编码表单体解析上限。
-	PropertyFormMaxBodySize = "goark.web.servlet.form.max-body-size"
-)
-
-const (
+	// PropertyMultipartEnabled 设置是否启用 multipart 解析。
+	PropertyMultipartEnabled = "goark.servlet.multipart.enabled"
 	// PropertyMultipartLocation 设置 multipart 临时文件目录。
-	PropertyMultipartLocation = "goark.web.servlet.multipart.location"
+	PropertyMultipartLocation = "goark.servlet.multipart.location"
 	// PropertyMultipartMaxFileSize 设置单个上传文件最大字节数。
-	PropertyMultipartMaxFileSize = "goark.web.servlet.multipart.max-file-size"
+	PropertyMultipartMaxFileSize = "goark.servlet.multipart.max-file-size"
 	// PropertyMultipartMaxRequestSize 设置 multipart 请求体最大字节数。
-	PropertyMultipartMaxRequestSize = "goark.web.servlet.multipart.max-request-size"
+	PropertyMultipartMaxRequestSize = "goark.servlet.multipart.max-request-size"
 	// PropertyMultipartFileSizeThreshold 设置 multipart 落盘前内存阈值。
-	PropertyMultipartFileSizeThreshold = "goark.web.servlet.multipart.file-size-threshold"
+	PropertyMultipartFileSizeThreshold = "goark.servlet.multipart.file-size-threshold"
+
+	// PropertyFormMaxBodySize 设置 URL 编码表单体解析上限。
+	PropertyFormMaxBodySize = "goark.servlet.form.max-body-size"
 )
 
 const (
 	// PropertyAsyncTimeout 设置 Servlet 异步请求超时。
-	PropertyAsyncTimeout = "goark.web.servlet.async.timeout"
+	PropertyAsyncTimeout = "goark.mvc.async.request-timeout"
 )
