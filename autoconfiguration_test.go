@@ -120,7 +120,7 @@ func TestAutoConfigure_whenHertzLogs_shouldRouteThroughGoarkLog(t *testing.T) {
 		t.Fatalf("close app failed: %v", err)
 	}
 	logs := output.String()
-	for _, expected := range []string{"HTTP server listening", "Begin graceful shutdown", "arkhos.hertz"} {
+	for _, expected := range []string{"HTTP server listening", "Begin graceful shutdown", "g.d.arkhos.hertz"} {
 		if !strings.Contains(logs, expected) {
 			t.Fatalf("goark-log output does not contain %q: %s", expected, logs)
 		}

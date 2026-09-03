@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	loggerName   = "arkhos.hertz"
+	loggerName   = "goark.dev.arkhos.hertz"
 	systemPrefix = "HERTZ: "
 )
 
