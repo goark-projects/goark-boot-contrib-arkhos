@@ -90,7 +90,9 @@ The generic header limit takes precedence over the Hertz-specific header limit.
 
 Size values are case-insensitive and use binary multiples. Supported suffixes
 are `B`, `K`, `KB`, `KiB`, `M`, `MB`, `MiB`, `G`, `GB`, `GiB`, `T`, `TB`,
-`TiB`, `P`, `PB`, and `PiB`. `0` and the unlimited sentinel `-1` are accepted.
+`TiB`, `P`, `PB`, and `PiB`. `0` retains the default. For maximum-size
+properties, `-1` removes the limit; it is not valid for
+`goark.servlet.multipart.file-size-threshold`.
 
 ```yaml
 server:
@@ -178,8 +180,9 @@ Servlet 与 MVC 配置：
 | `goark.mvc.async.request-timeout` | 未设置 | Servlet 异步请求默认超时 |
 
 大小单位不区分大小写，采用 1024 进制，支持 `B`、`K/KB/KiB`、
-`M/MB/MiB`、`G/GB/GiB`、`T/TB/TiB`、`P/PB/PiB`，并接受 `0` 与表示
-无限制的 `-1`。
+`M/MB/MiB`、`G/GB/GiB`、`T/TB/TiB`、`P/PB/PiB`。`0` 表示保留默认值；
+最大值类属性可使用 `-1` 表示不限制，但
+`goark.servlet.multipart.file-size-threshold` 不接受 `-1`。
 
 ## 开发
 

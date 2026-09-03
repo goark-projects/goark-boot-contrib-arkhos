@@ -64,7 +64,7 @@ func (p hertzProvider) NewContainer(config ContainerConfiguration) (servletconta
 	if config.MultipartEnable {
 		options = append(options, hertz.WithMultipartConfig(config.Multipart))
 	}
-	if config.MaxFormBodySize > 0 {
+	if config.MaxFormBodySize != 0 {
 		options = append(options, hertz.WithMaxFormBodySize(config.MaxFormBodySize))
 	}
 	options = append(options, p.containerOptions...)
@@ -90,10 +90,10 @@ func (p hertzProvider) NewServer(container servletcontainer.Container, config Se
 	if config.IdleTimeout > 0 {
 		options = append(options, hertz.WithIdleTimeout(config.IdleTimeout))
 	}
-	if config.MaxHeaderBytes > 0 {
+	if config.MaxHeaderBytes != 0 {
 		options = append(options, hertz.WithMaxHeaderBytes(config.MaxHeaderBytes))
 	}
-	if config.MaxRequestBodySize > 0 {
+	if config.MaxRequestBodySize != 0 {
 		options = append(options, hertz.WithMaxRequestBodySize(config.MaxRequestBodySize))
 	}
 	options = append(options, p.serverOptions...)

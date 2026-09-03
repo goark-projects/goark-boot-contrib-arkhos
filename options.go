@@ -2,6 +2,7 @@ package gbcarkhos
 
 import (
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -225,7 +226,7 @@ func (s *settings) applyEnvironment(environment coreenv.Environment) error {
 	if err := readDurationFirstInto(environment, &s.idleTimeout, PropertyHertzIdleTimeout); err != nil {
 		return err
 	}
-	if err := readIntFirst(environment, &s.maxHeaderBytes, PropertyServerMaxHTTPHeaderSize, PropertyHertzMaxHeaderBytes); err != nil {
+	if err := readByteSizeFirst(environment, &s.maxHeaderBytes, PropertyServerMaxHTTPHeaderSize, PropertyHertzMaxHeaderBytes); err != nil {
 		return err
 	}
 	if err := readByteSizeFirst(environment, &s.maxRequestBodySize, PropertyHertzMaxRequestBodySize); err != nil {
@@ -250,10 +251,38 @@ func (s *settings) readAddress(environment coreenv.Environment) error {
 		if !portSet {
 			port = 8080
 		}
-		s.address = net.JoinHostPort(strings.TrimSpace(host), strconv.Itoa(port))
+		host, err = normalizeServerHost(host)
+		if err != nil {
+			return err
+		}
+		s.address = net.JoinHostPort(host, strconv.Itoa(port))
 		return nil
 	}
 	return nil
+}
+
+func normalizeServerHost(value string) (string, error) {
+	host := strings.TrimSpace(value)
+	if host == "" {
+		return "", nil
+	}
+	if strings.HasPrefix(host, "[") || strings.HasSuffix(host, "]") {
+		if len(host) < 2 || host[0] != '[' || host[len(host)-1] != ']' {
+			return "", arkerrors.Newf(arkerrors.CodeInvalidArgument, "server address %q has invalid IPv6 brackets", value)
+		}
+		host = host[1 : len(host)-1]
+		address, err := netip.ParseAddr(host)
+		if err != nil || !address.Is6() {
+			return "", arkerrors.Newf(arkerrors.CodeInvalidArgument, "server address %q must contain only a host or IP", value)
+		}
+		return host, nil
+	}
+	if strings.Contains(host, ":") {
+		if _, err := netip.ParseAddr(host); err != nil {
+			return "", arkerrors.Newf(arkerrors.CodeInvalidArgument, "server address %q must not include a port", value)
+		}
+	}
+	return host, nil
 }
 
 func (s *settings) readMultipart(environment coreenv.Environment) error {
@@ -276,6 +305,9 @@ func (s *settings) readMultipart(environment coreenv.Environment) error {
 	}
 	if err := readByteSize64First(environment, &s.multipart.fileSizeThreshold, &s.multipart.enabled, PropertyMultipartFileSizeThreshold); err != nil {
 		return err
+	}
+	if s.multipart.fileSizeThreshold < 0 {
+		return arkerrors.Newf(arkerrors.CodeInvalidArgument, "multipart file size threshold %d must be >= 0", s.multipart.fileSizeThreshold)
 	}
 	if explicitlyDisabled {
 		s.multipart.enabled = false
@@ -331,31 +363,6 @@ func readDurationFirst(environment coreenv.Environment, keys ...string) (time.Du
 		}
 	}
 	return 0, false, nil
-}
-
-func readInt(environment coreenv.Environment, key string, target *int) error {
-	value, ok, err := coreenv.GetPropertyAsValue[int](environment, key)
-	if err != nil {
-		return arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read int property %q", key)
-	}
-	if ok {
-		*target = value
-	}
-	return nil
-}
-
-func readIntFirst(environment coreenv.Environment, target *int, keys ...string) error {
-	for _, key := range keys {
-		value, ok, err := coreenv.GetPropertyAsValue[int](environment, key)
-		if err != nil {
-			return arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read int property %q", key)
-		}
-		if ok {
-			*target = value
-			return nil
-		}
-	}
-	return nil
 }
 
 func readPort(environment coreenv.Environment, key string) (int, bool, error) {

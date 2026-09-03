@@ -1,6 +1,8 @@
 package gbcarkhos
 
 import (
+	"math"
+	"strconv"
 	"testing"
 	"time"
 
@@ -93,6 +95,93 @@ func TestNewSettings_whenEnvironmentPropertiesExist_shouldApplyServerProperties(
 	}
 }
 
+func TestNewSettings_whenHeaderSizeUsesDataSizeUnit_shouldApplyBytes(t *testing.T) {
+	environment := newTestEnvironment(t, map[string]any{
+		PropertyServerMaxHTTPHeaderSize: "16K",
+	})
+
+	settings, err := newSettings(environment, nil)
+	if err != nil {
+		t.Fatalf("new settings failed: %v", err)
+	}
+	if settings.maxHeaderBytes != 16<<10 {
+		t.Fatalf("max header bytes = %d, want %d", settings.maxHeaderBytes, 16<<10)
+	}
+}
+
+func TestNewSettings_whenHeaderSizeIsInvalid_shouldReturnError(t *testing.T) {
+	for _, value := range []string{"16XB", "999999999999999999999GiB"} {
+		t.Run(value, func(t *testing.T) {
+			environment := newTestEnvironment(t, map[string]any{
+				PropertyServerMaxHTTPHeaderSize: value,
+			})
+			if _, err := newSettings(environment, nil); err == nil {
+				t.Fatalf("header size %q should fail", value)
+			}
+		})
+	}
+
+	if strconv.IntSize == 32 {
+		environment := newTestEnvironment(t, map[string]any{
+			PropertyServerMaxHTTPHeaderSize: strconv.FormatInt(math.MaxInt32+1, 10),
+		})
+		if _, err := newSettings(environment, nil); err == nil {
+			t.Fatal("header size overflowing int should fail")
+		}
+	}
+}
+
+func TestNewSettings_whenLimitsAreUnlimited_shouldPreserveSentinel(t *testing.T) {
+	environment := newTestEnvironment(t, map[string]any{
+		PropertyServerMaxHTTPHeaderSize: "-1",
+		PropertyHertzMaxRequestBodySize: "-1",
+		PropertyFormMaxBodySize:         "-1",
+	})
+
+	settings, err := newSettings(environment, nil)
+	if err != nil {
+		t.Fatalf("new settings failed: %v", err)
+	}
+	if settings.maxHeaderBytes != -1 || settings.maxRequestBodySize != -1 || settings.maxFormBodySize != -1 {
+		t.Fatalf("unlimited sentinels were not preserved: %+v", settings)
+	}
+}
+
+func TestNewSettings_whenServerHostVaries_shouldBuildAddress(t *testing.T) {
+	tests := map[string]string{
+		"127.0.0.1": "127.0.0.1:8080",
+		"localhost": "localhost:8080",
+		"::1":       "[::1]:8080",
+		"[::1]":     "[::1]:8080",
+		"":          ":8080",
+	}
+	for host, want := range tests {
+		t.Run(host, func(t *testing.T) {
+			environment := newTestEnvironment(t, map[string]any{
+				PropertyServerAddress: host,
+				PropertyServerPort:    "8080",
+			})
+			settings, err := newSettings(environment, nil)
+			if err != nil {
+				t.Fatalf("new settings failed: %v", err)
+			}
+			if settings.address != want {
+				t.Fatalf("address = %q, want %q", settings.address, want)
+			}
+		})
+	}
+}
+
+func TestNewSettings_whenServerAddressContainsPort_shouldReturnError(t *testing.T) {
+	environment := newTestEnvironment(t, map[string]any{
+		PropertyServerAddress: "localhost:9090",
+		PropertyServerPort:    "8080",
+	})
+	if _, err := newSettings(environment, nil); err == nil {
+		t.Fatal("server.address containing a port should fail")
+	}
+}
+
 func TestNewSettings_whenOptionOverridesEnvironment_shouldUseOptionValue(t *testing.T) {
 	environment := newTestEnvironment(t, map[string]any{
 		PropertyServerAddress: "127.0.0.1",
@@ -174,6 +263,15 @@ func TestNewSettings_whenMultipartIsExplicitlyDisabled_shouldRemainDisabled(t *t
 	}
 	if settings.multipart.enabled {
 		t.Fatal("multipart should remain disabled")
+	}
+}
+
+func TestNewSettings_whenMultipartThresholdIsNegative_shouldReturnError(t *testing.T) {
+	environment := newTestEnvironment(t, map[string]any{
+		PropertyMultipartFileSizeThreshold: "-1",
+	})
+	if _, err := newSettings(environment, nil); err == nil {
+		t.Fatal("negative multipart file threshold should fail")
 	}
 }
 
