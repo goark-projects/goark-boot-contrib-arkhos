@@ -6,10 +6,25 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	servletcontainer "goark.dev/arkarta/servlet/container"
 	arkerrors "goark.dev/goark/errors"
 )
+
+const (
+	serverStartupTimeout      = 5 * time.Second
+	serverReadinessPollPeriod = time.Millisecond
+)
+
+type serverReadiness interface {
+	Running() bool
+}
+
+type serverStartupResult struct {
+	serveStopped bool
+	err          error
+}
 
 type serverState uint8
 
@@ -95,16 +110,23 @@ func (s *EmbeddedServer) Start(ctx context.Context) error {
 		errCh <- server.Serve(context.Background(), listener)
 	}()
 
-	select {
-	case err := <-errCh:
-		s.finishStop()
-		if err == nil {
-			return nil
-		}
-		return arkerrors.Wrap(arkerrors.CodeLifecycle, err, "arkhos server stopped during startup")
-	default:
+	result := waitServerStartup(ctx, server, errCh)
+	if result.err == nil && !result.serveStopped {
 		return nil
 	}
+	if result.serveStopped {
+		s.finishStop()
+		if result.err == nil {
+			return nil
+		}
+		return arkerrors.Wrap(arkerrors.CodeLifecycle, result.err, "arkhos server stopped during startup")
+	}
+	cleanupErr := abortServerStartup(server, listener, errCh)
+	s.finishStop()
+	return stderrors.Join(
+		arkerrors.Wrap(arkerrors.CodeLifecycle, result.err, "waiting arkhos server startup failed"),
+		cleanupErr,
+	)
 }
 
 // Stop 优雅关闭 HTTP 服务和已部署应用。
@@ -251,6 +273,46 @@ func waitServer(ctx context.Context, errCh <-chan error) error {
 	case <-ctx.Done():
 		return arkerrors.Wrap(arkerrors.CodeLifecycle, ctx.Err(), "waiting arkhos server shutdown canceled")
 	}
+}
+
+func waitServerStartup(ctx context.Context, server ManagedServer, errCh <-chan error) serverStartupResult {
+	readiness, ok := server.(serverReadiness)
+	if !ok {
+		select {
+		case err := <-errCh:
+			return serverStartupResult{serveStopped: true, err: err}
+		default:
+			return serverStartupResult{}
+		}
+	}
+
+	timer := time.NewTimer(serverStartupTimeout)
+	defer timer.Stop()
+	ticker := time.NewTicker(serverReadinessPollPeriod)
+	defer ticker.Stop()
+	for {
+		if readiness.Running() {
+			return serverStartupResult{}
+		}
+		select {
+		case err := <-errCh:
+			return serverStartupResult{serveStopped: true, err: err}
+		case <-ctx.Done():
+			return serverStartupResult{err: ctx.Err()}
+		case <-timer.C:
+			return serverStartupResult{err: context.DeadlineExceeded}
+		case <-ticker.C:
+		}
+	}
+}
+
+func abortServerStartup(server ManagedServer, listener net.Listener, errCh <-chan error) error {
+	listenerErr := closeListener(listener)
+	ctx, cancel := context.WithTimeout(context.Background(), serverStartupTimeout)
+	defer cancel()
+	shutdownErr := server.Shutdown(ctx)
+	serveErr := waitServer(ctx, errCh)
+	return stderrors.Join(shutdownErr, listenerErr, serveErr)
 }
 
 func closeListener(listener net.Listener) error {
