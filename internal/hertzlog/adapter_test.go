@@ -18,13 +18,16 @@ func TestAdapterMapsHertzMessagesToStructuredSlog(t *testing.T) {
 	adapter.CtxWarnf(context.Background(), "HERTZ: degraded=%t", true)
 
 	logs := output.String()
-	for _, expected := range []string{"level=DEBUG", `msg="Method=GET"`, "level=WARN", `msg="degraded=true"`, "framework=hertz"} {
+	for _, expected := range []string{"level=DEBUG", `msg="Method=GET"`, "level=WARN", `msg="degraded=true"`} {
 		if !strings.Contains(logs, expected) {
 			t.Fatalf("logs do not contain %q: %s", expected, logs)
 		}
 	}
 	if strings.Contains(logs, "HERTZ:") {
 		t.Fatalf("legacy Hertz prefix leaked into structured log: %s", logs)
+	}
+	if strings.Contains(logs, "framework=hertz") {
+		t.Fatalf("redundant Hertz framework attribute leaked into log: %s", logs)
 	}
 }
 
