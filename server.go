@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"net"
+	"net/http"
 	"sync"
 
 	servletcontainer "goark.dev/arkarta/servlet/container"
@@ -243,7 +244,7 @@ func waitServer(ctx context.Context, errCh <-chan error) error {
 	}
 	select {
 	case err := <-errCh:
-		if stderrors.Is(err, context.Canceled) {
+		if stderrors.Is(err, context.Canceled) || stderrors.Is(err, http.ErrServerClosed) || stderrors.Is(err, net.ErrClosed) {
 			return nil
 		}
 		return err

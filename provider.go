@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net"
-	"net/http"
 	"time"
 
 	"goark.dev/arkarta/servlet/async"
@@ -49,27 +48,6 @@ type Provider interface {
 type hertzProvider struct {
 	containerOptions []hertz.ContainerOption
 	serverOptions    []hertz.ServerOption
-}
-
-type hertzManagedServer struct {
-	*hertz.Server
-	serveCtx context.Context
-	cancel   context.CancelFunc
-}
-
-func (s *hertzManagedServer) Serve(ctx context.Context, listener net.Listener) error {
-	stop := context.AfterFunc(ctx, s.cancel)
-	defer stop()
-	err := s.Server.Serve(s.serveCtx, listener)
-	if errors.Is(err, context.Canceled) || errors.Is(err, http.ErrServerClosed) || errors.Is(err, net.ErrClosed) {
-		return nil
-	}
-	return err
-}
-
-func (s *hertzManagedServer) Shutdown(context.Context) error {
-	s.cancel()
-	return nil
 }
 
 func (hertzProvider) Name() string {
@@ -121,6 +99,5 @@ func (p hertzProvider) NewServer(container servletcontainer.Container, config Se
 	if err != nil {
 		return nil, err
 	}
-	serveCtx, cancel := context.WithCancel(context.Background())
-	return &hertzManagedServer{Server: server, serveCtx: serveCtx, cancel: cancel}, nil
+	return server, nil
 }

@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	goark.dev/arkarta v0.0.2-0.20260903014600-5fb9454949e6
-	goark.dev/arkhos v0.0.0-20260903014718-4ae9205850dd
+	goark.dev/arkhos v0.0.0-20260903034135-7cd6e58c11a7
 	goark.dev/boot v0.0.0-20260902110755-1bc0082c607a
 	goark.dev/goark v0.0.0-20260829150741-5da2fd1fb184
 )
