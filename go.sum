@@ -91,10 +91,10 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 go.yaml.in/yaml/v3 v3.0.4 h1:tfq32ie2Jv2UxXFdLJdh3jXuOzWiL1fo0bu/FbuKpbc=
 go.yaml.in/yaml/v3 v3.0.4/go.mod h1:DhzuOOF2ATzADvBadXxruRBLzYTpT36CKvDb3+aBEFg=
-goark.dev/arkarta v0.0.2-0.20260902141327-96ad2bcb67bc h1:RMKghTY87NQWuQFDX9/GAnP6HAoxfJsu4lr3zXwx700=
-goark.dev/arkarta v0.0.2-0.20260902141327-96ad2bcb67bc/go.mod h1:/ZMTyLm/iknACNnC1vr8paU7PbG63UH8x9fQtcoyIys=
-goark.dev/arkhos v0.0.0-20260902143258-32453a3c766d h1:Uhj7eLXNeQMIxKwimhgE0K+3VfU8pTFJzaGdTpu/N6Y=
-goark.dev/arkhos v0.0.0-20260902143258-32453a3c766d/go.mod h1:c4TLr41sI2kahsabRwiZbISgw4T9aVq3GXo7ybCYX0E=
+goark.dev/arkarta v0.0.2-0.20260903014600-5fb9454949e6 h1:wVKnMenbfvYky38Up02ytWe8Lny+wNpFMrIbJVm0gI4=
+goark.dev/arkarta v0.0.2-0.20260903014600-5fb9454949e6/go.mod h1:/ZMTyLm/iknACNnC1vr8paU7PbG63UH8x9fQtcoyIys=
+goark.dev/arkhos v0.0.0-20260903014718-4ae9205850dd h1:OuW3q3krrCiEQ9yzx8BOYjdAFYjpr484XvIG9PkmohA=
+goark.dev/arkhos v0.0.0-20260903014718-4ae9205850dd/go.mod h1:NHL/lnWcSQJWtzyyEV646UMsw231ayLxMru/HRhLVJ8=
 goark.dev/boot v0.0.0-20260902110755-1bc0082c607a h1:lQoVX5rbpEmMYPlxNehlch3Hi8uagcQXqjVnsGDZVMs=
 goark.dev/boot v0.0.0-20260902110755-1bc0082c607a/go.mod h1:YY1SsBhg3nAsEjcoALfPCEQSes8D3mzV+enTHVE+A+Y=
 goark.dev/goark v0.0.0-20260829150741-5da2fd1fb184 h1:Va9Qy9n2VSuqJEoVuterv8SJddCgdahU/WrBYWl+xXQ=
