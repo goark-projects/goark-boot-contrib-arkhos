@@ -10,9 +10,13 @@ import (
 	"sync/atomic"
 
 	"github.com/cloudwego/hertz/pkg/common/hlog"
+	goarklog "goark.dev/log"
 )
 
-const systemPrefix = "HERTZ: "
+const (
+	loggerName   = "arkhos.hertz"
+	systemPrefix = "HERTZ: "
+)
 
 // Adapter 把 Hertz 日志级别和消息映射到标准 slog。
 type Adapter struct {
@@ -24,7 +28,7 @@ var _ hlog.FullLogger = (*Adapter)(nil)
 
 // NewAdapter 创建不持有 slog Logger 生命周期的 Hertz 日志适配器。
 func newAdapter(logger *slog.Logger) *Adapter {
-	adapter := &Adapter{logger: logger}
+	adapter := &Adapter{logger: goarklog.WithName(logger, loggerName)}
 	adapter.level.Store(int32(hlog.LevelTrace))
 	return adapter
 }

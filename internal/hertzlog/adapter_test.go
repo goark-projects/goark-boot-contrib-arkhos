@@ -18,7 +18,7 @@ func TestAdapterMapsHertzMessagesToStructuredSlog(t *testing.T) {
 	adapter.CtxWarnf(context.Background(), "HERTZ: degraded=%t", true)
 
 	logs := output.String()
-	for _, expected := range []string{"level=DEBUG", `msg="Method=GET"`, "level=WARN", `msg="degraded=true"`} {
+	for _, expected := range []string{"level=DEBUG", `msg="Method=GET"`, "level=WARN", `msg="degraded=true"`, "goark.logger=arkhos.hertz"} {
 		if !strings.Contains(logs, expected) {
 			t.Fatalf("logs do not contain %q: %s", expected, logs)
 		}
