@@ -9,7 +9,7 @@ require (
 	goark.dev/boot v0.0.0-20260903174742-ca13efcd3a24
 	goark.dev/gbc-log v0.0.0-20260903182414-3d9bb4133dd8
 	goark.dev/goark v0.0.0-20260903173732-3182772149df
-	goark.dev/log v0.0.3-0.20260903140034-d1cef0b3d069
+	goark.dev/log v0.0.3-0.20260904031848-3a1f8d1056fe
 )
 
 require (
