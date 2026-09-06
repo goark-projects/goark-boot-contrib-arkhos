@@ -24,7 +24,7 @@ import (
 	"goark.dev/goark"
 	goarkcontainer "goark.dev/goark/container"
 	coreenv "goark.dev/goark/core/env"
-	goarklog "goark.dev/log"
+	"goark.dev/log"
 )
 
 func TestAutoConfigure_whenDeploymentBeanExists_shouldServeRequest(t *testing.T) {
@@ -130,10 +130,10 @@ func TestAutoConfigure_whenHertzLogs_shouldRouteThroughGoarkLog(t *testing.T) {
 }
 
 func loggerFactory(output *bytes.Buffer) gbclog.LoggerContextFactory {
-	return func(context.Context, coreenv.Environment) (*goarklog.LoggerContext, error) {
-		return goarklog.NewLoggerContext(goarklog.Options{
-			Appenders: []goarklog.Appender{goarklog.NewConsoleAppender(goarklog.WithConsoleWriter(output))},
-			Root:      goarklog.RootLogger{Level: slog.LevelInfo, AppenderRefs: []string{"console"}},
+	return func(context.Context, coreenv.Environment) (*log.LoggerContext, error) {
+		return log.NewLoggerContext(log.Options{
+			Appenders: []log.Appender{log.NewConsoleAppender(log.WithConsoleWriter(output))},
+			Root:      log.RootLogger{Level: slog.LevelInfo, AppenderRefs: []string{"console"}},
 		})
 	}
 }

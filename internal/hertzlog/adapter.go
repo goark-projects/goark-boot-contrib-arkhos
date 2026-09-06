@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cloudwego/hertz/pkg/common/hlog"
-	goarklog "goark.dev/log"
+	"goark.dev/log"
 )
 
 const (
@@ -28,7 +28,7 @@ var _ hlog.FullLogger = (*Adapter)(nil)
 
 // NewAdapter 创建不持有 slog Logger 生命周期的 Hertz 日志适配器。
 func newAdapter(logger *slog.Logger) *Adapter {
-	adapter := &Adapter{logger: goarklog.WithName(logger, loggerName)}
+	adapter := &Adapter{logger: log.WithName(logger, loggerName)}
 	adapter.level.Store(int32(hlog.LevelTrace))
 	return adapter
 }
