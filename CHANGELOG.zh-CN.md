@@ -18,6 +18,10 @@
 - 将 Hertz 日志路由到按组件命名的 `goark.dev/log` Logger。
 - 基于 Go 1.26 的跨平台测试、vet 和 race 门禁。
 
+### 变更
+
+- 将所有实际使用的 `golang.org/x` 模块对齐到最新稳定版本。
+
 ### 修复
 
 - 嵌入式启动会等待 Server 就绪。
