@@ -116,7 +116,11 @@ func WithMultipartConfig(config multipart.Config) Option {
 func WithAsyncTimeout(timeout time.Duration) Option {
 	return func(config *settings) error {
 		if timeout < 0 {
-			return arkerrors.Newf(arkerrors.CodeInvalidArgument, "arkhos async timeout %s must be >= 0", timeout)
+			return arkerrors.Newf(
+				arkerrors.CodeInvalidArgument,
+				"arkhos async timeout %s must be >= 0",
+				timeout,
+			)
 		}
 		config.async.timeout = timeout
 		return nil
@@ -149,10 +153,17 @@ func newSettings(environment coreenv.Environment, options []Option) (settings, e
 
 func (s settings) validate() error {
 	if s.provider != nil && (len(s.containerOptions) > 0 || len(s.serverOptions) > 0) {
-		return arkerrors.New(arkerrors.CodeInvalidArgument, "custom provider cannot use Hertz-specific options")
+		return arkerrors.New(
+			arkerrors.CodeInvalidArgument,
+			"custom provider cannot use Hertz-specific options",
+		)
 	}
 	if s.shutdown != ShutdownImmediate && s.shutdown != ShutdownGraceful {
-		return arkerrors.Newf(arkerrors.CodeInvalidArgument, "unsupported server shutdown mode %q", s.shutdown)
+		return arkerrors.Newf(
+			arkerrors.CodeInvalidArgument,
+			"unsupported server shutdown mode %q",
+			s.shutdown,
+		)
 	}
 	return nil
 }

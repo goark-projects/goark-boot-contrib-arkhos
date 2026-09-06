@@ -44,7 +44,10 @@ type ServerConfiguration struct {
 type Provider interface {
 	Name() string
 	NewContainer(config ContainerConfiguration) (servletcontainer.Container, error)
-	NewServer(container servletcontainer.Container, config ServerConfiguration) (ManagedServer, error)
+	NewServer(
+		container servletcontainer.Container,
+		config ServerConfiguration,
+	) (ManagedServer, error)
 }
 
 type hertzProvider struct {
@@ -56,7 +59,9 @@ func (hertzProvider) Name() string {
 	return "hertz"
 }
 
-func (p hertzProvider) NewContainer(config ContainerConfiguration) (servletcontainer.Container, error) {
+func (p hertzProvider) NewContainer(
+	config ContainerConfiguration,
+) (servletcontainer.Container, error) {
 	options := make([]hertz.ContainerOption, 0, len(p.containerOptions)+3)
 	if config.AsyncTimeout > 0 {
 		options = append(options, hertz.WithAsyncOptions(async.WithTimeout(config.AsyncTimeout)))
@@ -71,7 +76,10 @@ func (p hertzProvider) NewContainer(config ContainerConfiguration) (servletconta
 	return hertz.NewContainer(options...), nil
 }
 
-func (p hertzProvider) NewServer(container servletcontainer.Container, config ServerConfiguration) (ManagedServer, error) {
+func (p hertzProvider) NewServer(
+	container servletcontainer.Container,
+	config ServerConfiguration,
+) (ManagedServer, error) {
 	target, ok := container.(*hertz.Container)
 	if !ok || target == nil {
 		return nil, errors.New("gbc-arkhos: Hertz provider requires Hertz container")

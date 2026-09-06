@@ -21,22 +21,35 @@ func (s *settings) applyEnvironment(environment coreenv.Environment) error {
 	if value, ok := environment.GetProperty(PropertyServerShutdown); ok {
 		s.shutdown = ShutdownMode(strings.ToLower(strings.TrimSpace(value)))
 	}
-	if err := readDurationFirstInto(environment, &s.readTimeout, PropertyHertzReadTimeout); err != nil {
+	if err := readDurationFirstInto(
+		environment, &s.readTimeout, PropertyHertzReadTimeout,
+	); err != nil {
 		return err
 	}
-	if err := readDurationFirstInto(environment, &s.readHeaderTimeout, PropertyHertzReadHeaderTimeout); err != nil {
+	if err := readDurationFirstInto(
+		environment, &s.readHeaderTimeout, PropertyHertzReadHeaderTimeout,
+	); err != nil {
 		return err
 	}
-	if err := readDurationFirstInto(environment, &s.writeTimeout, PropertyHertzWriteTimeout); err != nil {
+	if err := readDurationFirstInto(
+		environment, &s.writeTimeout, PropertyHertzWriteTimeout,
+	); err != nil {
 		return err
 	}
-	if err := readDurationFirstInto(environment, &s.idleTimeout, PropertyHertzIdleTimeout); err != nil {
+	if err := readDurationFirstInto(
+		environment, &s.idleTimeout, PropertyHertzIdleTimeout,
+	); err != nil {
 		return err
 	}
-	if err := readByteSizeFirst(environment, &s.maxHeaderBytes, PropertyServerMaxHTTPHeaderSize, PropertyHertzMaxHeaderBytes); err != nil {
+	if err := readByteSizeFirst(
+		environment, &s.maxHeaderBytes,
+		PropertyServerMaxHTTPHeaderSize, PropertyHertzMaxHeaderBytes,
+	); err != nil {
 		return err
 	}
-	if err := readByteSizeFirst(environment, &s.maxRequestBodySize, PropertyHertzMaxRequestBodySize); err != nil {
+	if err := readByteSizeFirst(
+		environment, &s.maxRequestBodySize, PropertyHertzMaxRequestBodySize,
+	); err != nil {
 		return err
 	}
 	if err := readByteSize64(environment, PropertyFormMaxBodySize, &s.maxFormBodySize); err != nil {
@@ -74,18 +87,30 @@ func normalizeServerHost(value string) (string, error) {
 	}
 	if strings.HasPrefix(host, "[") || strings.HasSuffix(host, "]") {
 		if len(host) < 2 || host[0] != '[' || host[len(host)-1] != ']' {
-			return "", arkerrors.Newf(arkerrors.CodeInvalidArgument, "server address %q has invalid IPv6 brackets", value)
+			return "", arkerrors.Newf(
+				arkerrors.CodeInvalidArgument,
+				"server address %q has invalid IPv6 brackets",
+				value,
+			)
 		}
 		host = host[1 : len(host)-1]
 		address, err := netip.ParseAddr(host)
 		if err != nil || !address.Is6() {
-			return "", arkerrors.Newf(arkerrors.CodeInvalidArgument, "server address %q must contain only a host or IP", value)
+			return "", arkerrors.Newf(
+				arkerrors.CodeInvalidArgument,
+				"server address %q must contain only a host or IP",
+				value,
+			)
 		}
 		return host, nil
 	}
 	if strings.Contains(host, ":") {
 		if _, err := netip.ParseAddr(host); err != nil {
-			return "", arkerrors.Newf(arkerrors.CodeInvalidArgument, "server address %q must not include a port", value)
+			return "", arkerrors.Newf(
+				arkerrors.CodeInvalidArgument,
+				"server address %q must not include a port",
+				value,
+			)
 		}
 	}
 	return host, nil
@@ -103,17 +128,30 @@ func (s *settings) readMultipart(environment coreenv.Environment) error {
 		s.multipart.enabled = true
 		s.multipart.location = value
 	}
-	if err := readByteSize64First(environment, &s.multipart.maxFileSize, &s.multipart.enabled, PropertyMultipartMaxFileSize); err != nil {
+	if err := readByteSize64First(
+		environment, &s.multipart.maxFileSize,
+		&s.multipart.enabled, PropertyMultipartMaxFileSize,
+	); err != nil {
 		return err
 	}
-	if err := readByteSize64First(environment, &s.multipart.maxRequestSize, &s.multipart.enabled, PropertyMultipartMaxRequestSize); err != nil {
+	if err := readByteSize64First(
+		environment, &s.multipart.maxRequestSize,
+		&s.multipart.enabled, PropertyMultipartMaxRequestSize,
+	); err != nil {
 		return err
 	}
-	if err := readByteSize64First(environment, &s.multipart.fileSizeThreshold, &s.multipart.enabled, PropertyMultipartFileSizeThreshold); err != nil {
+	if err := readByteSize64First(
+		environment, &s.multipart.fileSizeThreshold,
+		&s.multipart.enabled, PropertyMultipartFileSizeThreshold,
+	); err != nil {
 		return err
 	}
 	if s.multipart.fileSizeThreshold < 0 {
-		return arkerrors.Newf(arkerrors.CodeInvalidArgument, "multipart file size threshold %d must be >= 0", s.multipart.fileSizeThreshold)
+		return arkerrors.Newf(
+			arkerrors.CodeInvalidArgument,
+			"multipart file size threshold %d must be >= 0",
+			s.multipart.fileSizeThreshold,
+		)
 	}
 	if explicitlyDisabled {
 		s.multipart.enabled = false
@@ -130,13 +168,21 @@ func (s *settings) readAsync(environment coreenv.Environment) error {
 		return nil
 	}
 	if timeout < 0 {
-		return arkerrors.Newf(arkerrors.CodeInvalidArgument, "async timeout %s must be >= 0", timeout)
+		return arkerrors.Newf(
+			arkerrors.CodeInvalidArgument,
+			"async timeout %s must be >= 0",
+			timeout,
+		)
 	}
 	s.async.timeout = timeout
 	return nil
 }
 
-func readDurationFirstInto(environment coreenv.Environment, target *time.Duration, keys ...string) error {
+func readDurationFirstInto(
+	environment coreenv.Environment,
+	target *time.Duration,
+	keys ...string,
+) error {
 	value, ok, err := readDurationFirst(environment, keys...)
 	if err != nil {
 		return err
@@ -147,11 +193,19 @@ func readDurationFirstInto(environment coreenv.Environment, target *time.Duratio
 	return nil
 }
 
-func readDurationFirst(environment coreenv.Environment, keys ...string) (time.Duration, bool, error) {
+func readDurationFirst(
+	environment coreenv.Environment,
+	keys ...string,
+) (time.Duration, bool, error) {
 	for _, key := range keys {
 		value, ok, err := coreenv.GetPropertyAsValue[time.Duration](environment, key)
 		if err != nil {
-			return 0, false, arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read duration property %q", key)
+			return 0, false, arkerrors.Wrapf(
+				arkerrors.CodeConversion,
+				err,
+				"failed to read duration property %q",
+				key,
+			)
 		}
 		if ok {
 			return value, true, nil
@@ -163,13 +217,22 @@ func readDurationFirst(environment coreenv.Environment, keys ...string) (time.Du
 func readPort(environment coreenv.Environment, key string) (int, bool, error) {
 	value, ok, err := coreenv.GetPropertyAsValue[int](environment, key)
 	if err != nil {
-		return 0, false, arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read port property %q", key)
+		return 0, false, arkerrors.Wrapf(
+			arkerrors.CodeConversion,
+			err,
+			"failed to read port property %q",
+			key,
+		)
 	}
 	if !ok {
 		return 0, false, nil
 	}
 	if value < 0 || value > 65535 {
-		return 0, false, arkerrors.Newf(arkerrors.CodeInvalidArgument, "port property %q must be between 0 and 65535", key)
+		return 0, false, arkerrors.Newf(
+			arkerrors.CodeInvalidArgument,
+			"port property %q must be between 0 and 65535",
+			key,
+		)
 	}
 	return value, true, nil
 }
@@ -178,7 +241,12 @@ func readBoolFirst(environment coreenv.Environment, keys ...string) (bool, bool,
 	for _, key := range keys {
 		value, ok, err := coreenv.GetPropertyAsValue[bool](environment, key)
 		if err != nil {
-			return false, false, arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read bool property %q", key)
+			return false, false, arkerrors.Wrapf(
+				arkerrors.CodeConversion,
+				err,
+				"failed to read bool property %q",
+				key,
+			)
 		}
 		if ok {
 			return value, true, nil

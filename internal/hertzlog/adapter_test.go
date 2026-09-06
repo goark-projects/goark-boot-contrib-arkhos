@@ -18,7 +18,11 @@ func TestAdapterMapsHertzMessagesToStructuredSlog(t *testing.T) {
 	adapter.CtxWarnf(context.Background(), "HERTZ: degraded=%t", true)
 
 	logs := output.String()
-	for _, expected := range []string{"level=DEBUG", `msg="Method=GET"`, "level=WARN", `msg="degraded=true"`, "goark.logger=goark.dev.arkhos.hertz"} {
+	expectedValues := []string{
+		"level=DEBUG", `msg="Method=GET"`, "level=WARN",
+		`msg="degraded=true"`, "goark.logger=goark.dev.arkhos.hertz",
+	}
+	for _, expected := range expectedValues {
 		if !strings.Contains(logs, expected) {
 			t.Fatalf("logs do not contain %q: %s", expected, logs)
 		}
@@ -37,7 +41,8 @@ func TestAdapterHonorsHertzLevelBeforeFormatting(t *testing.T) {
 	adapter.SetLevel(hlog.LevelWarn)
 	adapter.Infof("ignored=%s", "value")
 	adapter.Warnf("accepted=%s", "value")
-	if logs := output.String(); strings.Contains(logs, "ignored") || !strings.Contains(logs, "accepted=value") {
+	if logs := output.String(); strings.Contains(logs, "ignored") ||
+		!strings.Contains(logs, "accepted=value") {
 		t.Fatalf("unexpected filtered logs: %s", logs)
 	}
 }

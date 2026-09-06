@@ -10,7 +10,12 @@ import (
 
 func TestEmbeddedServerStart_whenProviderReturnsNilServer_shouldReturnError(t *testing.T) {
 	container := &providerTestContainer{}
-	server, err := NewEmbeddedServer(container, nil, nilServerProvider{}, ServerConfiguration{Address: "127.0.0.1:0"})
+	server, err := NewEmbeddedServer(
+		container,
+		nil,
+		nilServerProvider{},
+		ServerConfiguration{Address: "127.0.0.1:0"},
+	)
 	if err != nil {
 		t.Fatalf("new embedded server failed: %v", err)
 	}
@@ -25,7 +30,12 @@ func TestEmbeddedServerStart_whenAlreadyRunning_shouldBeIdempotent(t *testing.T)
 	if err != nil {
 		t.Fatalf("new container failed: %v", err)
 	}
-	server, err := NewEmbeddedServer(container, []*servletcontainer.Deployment(nil), provider, ServerConfiguration{Address: "127.0.0.1:0"})
+	server, err := NewEmbeddedServer(
+		container,
+		[]*servletcontainer.Deployment(nil),
+		provider,
+		ServerConfiguration{Address: "127.0.0.1:0"},
+	)
 	if err != nil {
 		t.Fatalf("new embedded server failed: %v", err)
 	}
@@ -50,7 +60,11 @@ func TestEmbeddedServerStart_whenAlreadyRunning_shouldBeIdempotent(t *testing.T)
 		t.Fatalf("second start failed: %v", err)
 	}
 	if server.Address() != address {
-		t.Fatalf("address changed after idempotent start: got %q, want %q", server.Address(), address)
+		t.Fatalf(
+			"address changed after idempotent start: got %q, want %q",
+			server.Address(),
+			address,
+		)
 	}
 }
 
@@ -61,7 +75,12 @@ func TestEmbeddedServerStartThenImmediateClose_shouldNotBlock(t *testing.T) {
 		if err != nil {
 			t.Fatalf("new container failed: %v", err)
 		}
-		server, err := NewEmbeddedServer(container, nil, provider, ServerConfiguration{Address: "127.0.0.1:0"})
+		server, err := NewEmbeddedServer(
+			container,
+			nil,
+			provider,
+			ServerConfiguration{Address: "127.0.0.1:0"},
+		)
 		if err != nil {
 			t.Fatalf("new embedded server failed: %v", err)
 		}
@@ -114,7 +133,13 @@ func TestEmbeddedServerStop_whenShutdownModeConfigured_shouldUseMatchingOperatio
 			}
 			shutdownCalls, closeCalls := managed.calls()
 			if shutdownCalls != test.wantShutdown || closeCalls != test.wantClose {
-				t.Fatalf("calls = shutdown:%d close:%d, want shutdown:%d close:%d", shutdownCalls, closeCalls, test.wantShutdown, test.wantClose)
+				t.Fatalf(
+					"calls = shutdown:%d close:%d, want shutdown:%d close:%d",
+					shutdownCalls,
+					closeCalls,
+					test.wantShutdown,
+					test.wantClose,
+				)
 			}
 		})
 	}
@@ -130,6 +155,9 @@ func (nilServerProvider) NewContainer(ContainerConfiguration) (servletcontainer.
 	return &providerTestContainer{}, nil
 }
 
-func (nilServerProvider) NewServer(servletcontainer.Container, ServerConfiguration) (ManagedServer, error) {
+func (nilServerProvider) NewServer(
+	servletcontainer.Container,
+	ServerConfiguration,
+) (ManagedServer, error) {
 	return nil, nil
 }

@@ -37,7 +37,12 @@ func readByteSize(environment coreenv.Environment, key string, target *int) erro
 	}
 	size, err := parseByteSize(value)
 	if err != nil {
-		return arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read byte size property %q", key)
+		return arkerrors.Wrapf(
+			arkerrors.CodeConversion,
+			err,
+			"failed to read byte size property %q",
+			key,
+		)
 	}
 	if size > int64(math.MaxInt) {
 		return arkerrors.Newf(arkerrors.CodeConversion, "byte size property %q overflows int", key)
@@ -63,13 +68,23 @@ func readByteSize64(environment coreenv.Environment, key string, target *int64) 
 	}
 	size, err := parseByteSize(value)
 	if err != nil {
-		return arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read byte size property %q", key)
+		return arkerrors.Wrapf(
+			arkerrors.CodeConversion,
+			err,
+			"failed to read byte size property %q",
+			key,
+		)
 	}
 	*target = size
 	return nil
 }
 
-func readByteSize64First(environment coreenv.Environment, target *int64, found *bool, keys ...string) error {
+func readByteSize64First(
+	environment coreenv.Environment,
+	target *int64,
+	found *bool,
+	keys ...string,
+) error {
 	for _, key := range keys {
 		if _, ok := environment.GetProperty(key); !ok {
 			continue

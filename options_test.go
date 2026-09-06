@@ -24,10 +24,18 @@ func TestNewSettings_whenEnvironmentIsNil_shouldUseSafeDefaults(t *testing.T) {
 		t.Fatalf("timeouts should be unset by default: %+v", settings)
 	}
 	if settings.maxFormBodySize != servlet.DefaultMaxFormBodySize {
-		t.Fatalf("form body size = %d, want %d", settings.maxFormBodySize, servlet.DefaultMaxFormBodySize)
+		t.Fatalf(
+			"form body size = %d, want %d",
+			settings.maxFormBodySize,
+			servlet.DefaultMaxFormBodySize,
+		)
 	}
 	if settings.maxRequestBodySize != int(servlet.DefaultMaxFormBodySize) {
-		t.Fatalf("request body size = %d, want %d", settings.maxRequestBodySize, servlet.DefaultMaxFormBodySize)
+		t.Fatalf(
+			"request body size = %d, want %d",
+			settings.maxRequestBodySize,
+			servlet.DefaultMaxFormBodySize,
+		)
 	}
 }
 
@@ -142,7 +150,8 @@ func TestNewSettings_whenLimitsAreUnlimited_shouldPreserveSentinel(t *testing.T)
 	if err != nil {
 		t.Fatalf("new settings failed: %v", err)
 	}
-	if settings.maxHeaderBytes != -1 || settings.maxRequestBodySize != -1 || settings.maxFormBodySize != -1 {
+	if settings.maxHeaderBytes != -1 || settings.maxRequestBodySize != -1 ||
+		settings.maxFormBodySize != -1 {
 		t.Fatalf("unlimited sentinels were not preserved: %+v", settings)
 	}
 }

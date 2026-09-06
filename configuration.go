@@ -16,14 +16,17 @@ import (
 // AutoConfigure 创建 Arkhos 嵌入式容器自动配置。
 func AutoConfigure(options ...Option) boot.AutoConfiguration {
 	copied := append([]Option(nil), options...)
-	return boot.NewAutoConfiguration(StarterID, func(ctx context.Context, app *goark.ApplicationContext) error {
-		if !hasConfiguration(app, gbclog.StarterID+".configuration") {
-			if err := gbclog.AutoConfigure().Configure(ctx, app); err != nil {
-				return err
+	return boot.NewAutoConfiguration(
+		StarterID,
+		func(ctx context.Context, app *goark.ApplicationContext) error {
+			if !hasConfiguration(app, gbclog.StarterID+".configuration") {
+				if err := gbclog.AutoConfigure().Configure(ctx, app); err != nil {
+					return err
+				}
 			}
-		}
-		return app.RegisterConfiguration(configuration{options: copied})
-	})
+			return app.RegisterConfiguration(configuration{options: copied})
+		},
+	)
 }
 
 type configuration struct {
@@ -42,7 +45,10 @@ func (c configuration) Register(ctx context.Context, registry *goarkcontainer.Re
 	return c.RegisterWithContext(ctx, appcontext.NewConfigurationContext(nil, registry))
 }
 
-func (c configuration) RegisterWithContext(_ context.Context, config appcontext.ConfigurationContext) error {
+func (c configuration) RegisterWithContext(
+	_ context.Context,
+	config appcontext.ConfigurationContext,
+) error {
 	resolved, err := newSettings(config.Environment(), c.options)
 	if err != nil {
 		return err
@@ -75,7 +81,11 @@ func (c configuration) RegisterWithContext(_ context.Context, config appcontext.
 		config.Registry(),
 		BeanNameServer,
 		func(ctx context.Context, resolver goarkcontainer.Resolver) (*EmbeddedServer, error) {
-			container, err := goark.Get[servletcontainer.Container](ctx, resolver, BeanNameContainer)
+			container, err := goark.Get[servletcontainer.Container](
+				ctx,
+				resolver,
+				BeanNameContainer,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -83,7 +93,12 @@ func (c configuration) RegisterWithContext(_ context.Context, config appcontext.
 			if err != nil {
 				return nil, err
 			}
-			return NewEmbeddedServer(container, deployments, provider, resolved.serverConfiguration())
+			return NewEmbeddedServer(
+				container,
+				deployments,
+				provider,
+				resolved.serverConfiguration(),
+			)
 		},
 		goarkcontainer.WithDependencies(BeanNameContainer),
 		goarkcontainer.WithDependsOn(BeanNameHertzLogger),

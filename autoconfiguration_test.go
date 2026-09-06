@@ -19,7 +19,7 @@ import (
 	"goark.dev/arkhos/hertz"
 	"goark.dev/boot"
 	"goark.dev/boot/configdata"
-	"goark.dev/gbc-arkhos"
+	gbcarkhos "goark.dev/gbc-arkhos"
 	gbclog "goark.dev/gbc-log"
 	"goark.dev/goark"
 	goarkcontainer "goark.dev/goark/container"
@@ -50,7 +50,11 @@ server:
 	if !ok {
 		t.Fatal("expected application context")
 	}
-	server, err := goark.Get[*gbcarkhos.EmbeddedServer](t.Context(), appContext, gbcarkhos.BeanNameServer)
+	server, err := goark.Get[*gbcarkhos.EmbeddedServer](
+		t.Context(),
+		appContext,
+		gbcarkhos.BeanNameServer,
+	)
 	if err != nil {
 		t.Fatalf("resolve embedded server failed: %v", err)
 	}
@@ -87,7 +91,11 @@ goark:
 	if !ok {
 		t.Fatal("expected application context")
 	}
-	server, err := goark.Get[*gbcarkhos.EmbeddedServer](t.Context(), appContext, gbcarkhos.BeanNameServer)
+	server, err := goark.Get[*gbcarkhos.EmbeddedServer](
+		t.Context(),
+		appContext,
+		gbcarkhos.BeanNameServer,
+	)
 	if err != nil {
 		t.Fatalf("resolve embedded server failed: %v", err)
 	}
@@ -111,7 +119,11 @@ func TestAutoConfigure_whenHertzLogs_shouldRouteThroughGoarkLog(t *testing.T) {
 		t.Fatalf("boot run failed: %v", err)
 	}
 	appContext, _ := app.Context()
-	server := goark.MustGet[*gbcarkhos.EmbeddedServer](t.Context(), appContext, gbcarkhos.BeanNameServer)
+	server := goark.MustGet[*gbcarkhos.EmbeddedServer](
+		t.Context(),
+		appContext,
+		gbcarkhos.BeanNameServer,
+	)
 	if body := requestUntilOK(t, server.URL()+"/healthz"); body != "UP" {
 		t.Fatalf("body = %q, want UP", body)
 	}
@@ -124,7 +136,8 @@ func TestAutoConfigure_whenHertzLogs_shouldRouteThroughGoarkLog(t *testing.T) {
 			t.Fatalf("goark-log output does not contain %q: %s", expected, logs)
 		}
 	}
-	if strings.Contains(logs, "HERTZ:") || strings.Contains(logs, "engine.go:") || strings.Contains(logs, "framework=hertz") {
+	if strings.Contains(logs, "HERTZ:") || strings.Contains(logs, "engine.go:") ||
+		strings.Contains(logs, "framework=hertz") {
 		t.Fatalf("legacy Hertz output leaked into goark-log: %s", logs)
 	}
 }
@@ -148,24 +161,41 @@ func (deploymentConfiguration) Order() int {
 	return 0
 }
 
-func (deploymentConfiguration) Register(ctx context.Context, registry *goarkcontainer.Registry) error {
+func (deploymentConfiguration) Register(
+	ctx context.Context,
+	registry *goarkcontainer.Registry,
+) error {
 	app, err := servlet.NewWebApp("test")
 	if err != nil {
 		return err
 	}
-	deployment, err := servletcontainer.NewDeployment(app,
-		servletcontainer.WithMapping("/", servlet.HandlerFunc(func(_ context.Context, req *servlet.Request, res servlet.Response) error {
-			if req.Path() != "/healthz" {
-				return servlet.NewHTTPError(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil)
-			}
-			_, err := res.WriteString("UP")
-			return err
-		})),
+	deployment, err := servletcontainer.NewDeployment(
+		app,
+		servletcontainer.WithMapping(
+			"/",
+			servlet.HandlerFunc(
+				func(_ context.Context, req *servlet.Request, res servlet.Response) error {
+					if req.Path() != "/healthz" {
+						return servlet.NewHTTPError(
+							http.StatusNotFound,
+							http.StatusText(http.StatusNotFound),
+							nil,
+						)
+					}
+					_, err := res.WriteString("UP")
+					return err
+				},
+			),
+		),
 	)
 	if err != nil {
 		return err
 	}
-	return goarkcontainer.RegisterInstance[*servletcontainer.Deployment](registry, "testDeployment", deployment)
+	return goarkcontainer.RegisterInstance[*servletcontainer.Deployment](
+		registry,
+		"testDeployment",
+		deployment,
+	)
 }
 
 type asyncDeploymentConfiguration struct{}
@@ -178,32 +208,52 @@ func (asyncDeploymentConfiguration) Order() int {
 	return 0
 }
 
-func (asyncDeploymentConfiguration) Register(ctx context.Context, registry *goarkcontainer.Registry) error {
+func (asyncDeploymentConfiguration) Register(
+	ctx context.Context,
+	registry *goarkcontainer.Registry,
+) error {
 	app, err := servlet.NewWebApp("async")
 	if err != nil {
 		return err
 	}
-	deployment, err := servletcontainer.NewDeployment(app,
+	deployment, err := servletcontainer.NewDeployment(
+		app,
 		servletcontainer.WithProfile(servletcontainer.ProfileAsyncStream),
-		servletcontainer.WithMapping("/", servlet.HandlerFunc(func(ctx context.Context, req *servlet.Request, res servlet.Response) error {
-			if req.Path() != "/async-timeout" {
-				return servlet.NewHTTPError(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil)
-			}
-			asyncCtx, err := hertz.StartAsync(ctx, req, res)
-			if err != nil {
-				return err
-			}
-			if err := asyncCtx.Await(context.Background()); !errors.Is(err, servletasync.ErrTimeout) {
-				return err
-			}
-			_, err = res.WriteString("timeout")
-			return err
-		})),
+		servletcontainer.WithMapping(
+			"/",
+			servlet.HandlerFunc(
+				func(ctx context.Context, req *servlet.Request, res servlet.Response) error {
+					if req.Path() != "/async-timeout" {
+						return servlet.NewHTTPError(
+							http.StatusNotFound,
+							http.StatusText(http.StatusNotFound),
+							nil,
+						)
+					}
+					asyncCtx, err := hertz.StartAsync(ctx, req, res)
+					if err != nil {
+						return err
+					}
+					if err := asyncCtx.Await(context.Background()); !errors.Is(
+						err,
+						servletasync.ErrTimeout,
+					) {
+						return err
+					}
+					_, err = res.WriteString("timeout")
+					return err
+				},
+			),
+		),
 	)
 	if err != nil {
 		return err
 	}
-	return goarkcontainer.RegisterInstance[*servletcontainer.Deployment](registry, "testAsyncDeployment", deployment)
+	return goarkcontainer.RegisterInstance[*servletcontainer.Deployment](
+		registry,
+		"testAsyncDeployment",
+		deployment,
+	)
 }
 
 func requestUntilOK(t *testing.T, target string) string {

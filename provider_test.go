@@ -33,7 +33,11 @@ func TestAutoConfigureWithProviderUsesStandardContainerContract(t *testing.T) {
 	if !ok {
 		t.Fatal("expected application context")
 	}
-	resolved, err := goark.Get[servletcontainer.Container](t.Context(), appContext, BeanNameContainer)
+	resolved, err := goark.Get[servletcontainer.Container](
+		t.Context(),
+		appContext,
+		BeanNameContainer,
+	)
 	if err != nil {
 		t.Fatalf("resolve standard container failed: %v", err)
 	}
@@ -61,12 +65,17 @@ func (*providerTestProvider) Name() string {
 	return "test"
 }
 
-func (p *providerTestProvider) NewContainer(config ContainerConfiguration) (servletcontainer.Container, error) {
+func (p *providerTestProvider) NewContainer(
+	config ContainerConfiguration,
+) (servletcontainer.Container, error) {
 	p.containerConfig = config
 	return p.container, nil
 }
 
-func (p *providerTestProvider) NewServer(container servletcontainer.Container, config ServerConfiguration) (ManagedServer, error) {
+func (p *providerTestProvider) NewServer(
+	container servletcontainer.Container,
+	config ServerConfiguration,
+) (ManagedServer, error) {
 	p.serverConfig = config
 	p.server.container = container
 	return p.server, nil
@@ -78,10 +87,18 @@ type providerTestContainer struct {
 }
 
 func (*providerTestContainer) Metadata() servletcontainer.Metadata {
-	return servletcontainer.NewMetadata("test", "1", []servletcontainer.Profile{servletcontainer.ProfileCore}, nil)
+	return servletcontainer.NewMetadata(
+		"test",
+		"1",
+		[]servletcontainer.Profile{servletcontainer.ProfileCore},
+		nil,
+	)
 }
 
-func (*providerTestContainer) Deploy(context.Context, *servletcontainer.Deployment) (servletcontainer.Application, error) {
+func (*providerTestContainer) Deploy(
+	context.Context,
+	*servletcontainer.Deployment,
+) (servletcontainer.Application, error) {
 	return nil, nil
 }
 
