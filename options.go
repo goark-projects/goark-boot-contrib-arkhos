@@ -330,17 +330,6 @@ func (s *settings) readAsync(environment coreenv.Environment) error {
 	return nil
 }
 
-func readDuration(environment coreenv.Environment, key string, target *time.Duration) error {
-	value, ok, err := coreenv.GetPropertyAsValue[time.Duration](environment, key)
-	if err != nil {
-		return arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read duration property %q", key)
-	}
-	if ok {
-		*target = value
-	}
-	return nil
-}
-
 func readDurationFirstInto(environment coreenv.Environment, target *time.Duration, keys ...string) error {
 	value, ok, err := readDurationFirst(environment, keys...)
 	if err != nil {
@@ -399,16 +388,4 @@ func firstString(environment coreenv.Environment, keys ...string) (string, bool)
 		}
 	}
 	return "", false
-}
-
-func readInt64(environment coreenv.Environment, key string, target *int64, found *bool) error {
-	value, ok, err := coreenv.GetPropertyAsValue[int64](environment, key)
-	if err != nil {
-		return arkerrors.Wrapf(arkerrors.CodeConversion, err, "failed to read int64 property %q", key)
-	}
-	if ok {
-		*target = value
-		*found = true
-	}
-	return nil
 }
