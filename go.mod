@@ -1,6 +1,6 @@
 module goark.dev/gbc-arkhos
 
-go 1.25
+go 1.26.0
 
 require (
 	github.com/cloudwego/hertz v0.10.6
